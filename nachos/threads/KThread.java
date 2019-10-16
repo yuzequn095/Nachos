@@ -290,6 +290,7 @@ public class KThread {
 		Machine.interrupt().disable();
 		if (this.status != statusFinished) {
 			this.joinedFrom = currentThread();
+			System.out.println("Joined from: " + this.joinedFrom);
 			joinedThreads.add(this);
 			if (this.status != statusReady) {
 				this.ready();
@@ -427,7 +428,7 @@ public class KThread {
 	 * Simple test for the situation where the child finishes before
 	 * the parent calls join on it.
      */
-	private static void joinTest1 () {
+	private static void joinTest1() {
 		KThread child1 = new KThread(new Runnable() {
 			public void run() {
 				System.out.println("I (heart) Nachos!");
@@ -452,6 +453,40 @@ public class KThread {
 	}
 
 	/**
+	 * Test for the situation that current thread can call join on
+	 * multiple child threads.
+	 */
+	private static void joinTest2() {
+		// Create three child threads
+		System.out.println("Start join test 2.");
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I'm the first child!");
+			}
+		});
+		child1.setName("child1").fork();
+		System.out.println("Status 1: "+child1.status);
+		child1.join();
+		System.out.println("After joining, child1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
+		KThread child2 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I'm the second child!");
+			}
+		});
+		child2.setName("child2").fork();
+		child2.join();
+		KThread child3 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I'm the third child!");
+			}
+		});
+		child3.setName("child3").fork();
+		child3.join();
+	}
+
+	/**
 	 * Tests whether this module is working.
 	 */
 	public static void selfTest() {
@@ -460,7 +495,8 @@ public class KThread {
 		new KThread(new PingTest(1)).setName("forked thread").fork();
 		new PingTest(0).run();
 		// Run join tests
-		joinTest1();
+//		joinTest1();
+		joinTest2();
 	}
 
 	private static final char dbgThread = 't';
