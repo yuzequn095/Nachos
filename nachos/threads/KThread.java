@@ -204,6 +204,9 @@ public class KThread {
 		toBeDestroyed = currentThread;
 
 		currentThread.status = statusFinished;
+		if (currentThread().joinedFrom != null) {
+			currentThread().joinedFrom.ready();
+		}
 
 		sleep();
 	}
