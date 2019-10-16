@@ -2,6 +2,8 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.util.HashSet;
+
 /**
  * A KThread is a thread that can be used to execute Nachos kernel code. Nachos
  * allows multiple threads to run concurrently.
@@ -282,9 +284,23 @@ public class KThread {
 	 */
 	public void join() {
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
-
+		System.out.println("Joining to thread: " + toString());
 		Lib.assertTrue(this != currentThread);
-
+		Lib.assertTrue(!joinedThreads.contains(this));
+		Machine.interrupt().disable();
+		if (this.status != statusFinished) {
+			this.joinedFrom = currentThread();
+			joinedThreads.add(this);
+			if (this.status != statusReady) {
+				this.ready();
+			}
+			sleep();
+			Machine.interrupt().enable();
+			return;
+		} else {
+			System.out.println("Child process already finished before joining, parent continues.");
+			return;
+		}
 	}
 
 	/**
@@ -408,6 +424,34 @@ public class KThread {
 	}
 
 	/**
+	 * Simple test for the situation where the child finishes before
+	 * the parent calls join on it.
+     */
+	private static void joinTest1 () {
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I (heart) Nachos!");
+			}
+		});
+		child1.setName("child1").fork();
+
+		// We want the child to finish before we call join.  Although
+		// our solutions to the problems cannot busy wait, our test
+		// programs can!
+
+		for (int i = 0; i < 5; i++) {
+			System.out.println("busy...");
+			KThread.currentThread().yield();
+		}
+		System.out.println("Before joining, child 1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		child1.join();
+		System.out.println("After joining, child1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
+	}
+
+	/**
 	 * Tests whether this module is working.
 	 */
 	public static void selfTest() {
@@ -415,6 +459,8 @@ public class KThread {
 
 		new KThread(new PingTest(1)).setName("forked thread").fork();
 		new PingTest(0).run();
+		// Run join tests
+		joinTest1();
 	}
 
 	private static final char dbgThread = 't';
@@ -465,4 +511,8 @@ public class KThread {
 	private static KThread toBeDestroyed = null;
 
 	private static KThread idleThread = null;
+
+	private static HashSet<KThread> joinedThreads = new HashSet<>();
+
+	private KThread joinedFrom;
 }
