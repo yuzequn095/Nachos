@@ -1,12 +1,15 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.*;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
  * until a certain time.
  */
 public class Alarm {
+	private PriorityQueue<timeCompare> timeQueue = new PriorityQueue<timeCompare>();
+
 	/**
 	 * Allocate a new Alarm. Set the machine's timer interrupt handler to this
 	 * alarm's callback.
@@ -22,6 +25,27 @@ public class Alarm {
 		});
 	}
 
+	// Inner private class implements Comparable
+	private class timeCompare  implements Comparable<timeCompare>{
+		private KThread thread;
+		private long time;
+
+		public timeCompare (KThread thread, long time){
+			this.thread = thread;
+			this.time = time;
+		}
+
+		public int compareTo(timeCompare timeCompare){
+			if (time > timeCompare.time){
+				return 1;
+			}else if (time < timeCompare.time) {
+				return -1;
+			}else{
+				return 0;
+			}
+		}
+	}
+
 	/**
 	 * The timer interrupt handler. This is called by the machine's timer
 	 * periodically (approximately every 500 clock ticks). Causes the current
@@ -29,7 +53,19 @@ public class Alarm {
 	 * should be run.
 	 */
 	public void timerInterrupt() {
+		long currTime = Machine.timer().getTime();
+		//boolean status = Machine.interrupt().disable();
+
+		while (!timeQueue.isEmpty() && timeQueue.peek().time<=currTime){
+			timeCompare timeCompare = timeQueue.poll();
+			KThread thread = timeCompare.thread;
+			if (thread != null){
+				thread.ready();
+			}
+		}
+
 		KThread.currentThread().yield();
+		//Machine.interrupt().restore(status);
 	}
 
 	/**
@@ -45,8 +81,15 @@ public class Alarm {
 	 * @see nachos.machine.Timer#getTime()
 	 */
 	public void waitUntil(long x) {
-		// for now, cheat just to get something working (busy waiting is bad)
 		long wakeTime = Machine.timer().getTime() + x;
+		KThread thread = KThread.currentThread();
+		timeCompare timeCompare = new timeCompare(thread, wakeTime);
+		boolean status = Machine.interrupt().disable();
+
+		//timeQueue.add(timeCompare);
+		//thread.sleep();
+		//Machine.interrupt().restore(satus);
+
 		while (wakeTime > Machine.timer().getTime())
 			KThread.yield();
 	}
