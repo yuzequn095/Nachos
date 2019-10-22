@@ -2,6 +2,10 @@ package nachos.threads;
 
 import nachos.machine.*;
 
+import java.net.FileNameMap;
+import java.util.HashSet;
+
+
 /**
  * A KThread is a thread that can be used to execute Nachos kernel code. Nachos
  * allows multiple threads to run concurrently.
@@ -202,6 +206,9 @@ public class KThread {
 		toBeDestroyed = currentThread;
 
 		currentThread.status = statusFinished;
+		if (currentThread().joinedFrom != null) {
+			currentThread().joinedFrom.ready();
+		}
 
 		sleep();
 	}
@@ -282,9 +289,24 @@ public class KThread {
 	 */
 	public void join() {
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
-
+		System.out.println("Joining to thread: " + toString());
 		Lib.assertTrue(this != currentThread);
-
+		Lib.assertTrue(!joinedThreads.contains(this));
+		Machine.interrupt().disable();
+		if (this.status != statusFinished) {
+			this.joinedFrom = currentThread();
+			System.out.println("Joined from: " + this.joinedFrom);
+			joinedThreads.add(this);
+			if (this.status != statusReady) {
+				this.ready();
+			}
+			sleep();
+			Machine.interrupt().enable();
+			return;
+		} else {
+			System.out.println("Child process already finished before joining, parent continues.");
+			return;
+		}
 	}
 
 	/**
@@ -408,6 +430,213 @@ public class KThread {
 	}
 
 	/**
+	 * Simple test for the situation where the child finishes before
+	 * the parent calls join on it.
+     */
+	private static void joinTest1() {
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I (heart) Nachos!");
+			}
+		});
+		child1.setName("child1").fork();
+
+		// We want the child to finish before we call join.  Although
+		// our solutions to the problems cannot busy wait, our test
+		// programs can!
+
+		for (int i = 0; i < 5; i++) {
+			System.out.println("busy...");
+			KThread.currentThread().yield();
+		}
+		System.out.println("Before joining, child 1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		child1.join();
+		System.out.println("After joining, child1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		try {
+			Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
+		}
+		catch(Error e) {
+			System.out.println("***FAILED***");
+		}
+		System.out.println("***PASSED***");
+	}
+
+	/**
+	 * Test for the situation that current thread can call join on
+	 * multiple child threads in succession.
+	 */
+	private static void joinTest2() {
+		// Create three child threads
+		System.out.println("Start join test 2.");
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I'm the first child!");
+			}
+		});
+		child1.setName("child1").fork();
+		System.out.println("Status 1: "+child1.status);
+		child1.join();
+		System.out.println("After joining, child1 should be finished.");
+		System.out.println("is it? " + (child1.status == statusFinished));
+		Lib.assertTrue((child1.status == statusFinished), " Expected child1 to be finished.");
+		KThread child2 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I'm the second child!");
+			}
+		});
+              		child2.setName("child2").fork();
+		child2.join();
+		System.out.println("After joining, child2 should be finished.");
+		System.out.println("is it? " + (child2.status == statusFinished));
+		Lib.assertTrue((child2.status == statusFinished), " Expected child2 to be finished.");
+		KThread child3 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I'm the third child!");
+			}
+		});
+		child3.setName("child3").fork();
+		child3.join();
+		System.out.println("After joining, child3 should be finished.");
+		System.out.println("is it? " + (child3.status == statusFinished));
+		Lib.assertTrue((child3.status == statusFinished), " Expected child3 to be finished.");
+		System.out.println("***PASSED***");
+	}
+
+	/**
+	 * Test for the situation that join is called on a thread
+	 * multiple times by the parent and nachos should assert.
+	 */
+
+	private static void joinTest3() {
+		// Create the child
+		System.out.println("Start join test 3.");
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I can't be joined more than once!");
+			}
+		});
+		child1.setName("child1");
+		child1.fork();
+		child1.join();
+		boolean asserted = false;
+		try {
+			child1.join();
+		}
+		catch(Error e) {
+			asserted = true;
+			System.out.println("Asserted on multiple join on child 1");
+			System.out.println("***PASSED***");
+		}
+		finally {
+			try {
+				Lib.assertTrue(asserted);
+			} catch (Error e) {
+				System.out.println("***FAILED***");
+			}
+		}
+	}
+
+	/**
+	 * Test for the situation that join is called on a thread
+	 * multiple times by different threads and nachos should assert.
+	 */
+
+	private static void joinTest4() {
+		System.out.println("Start join test 4.");
+		// Create the child
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("I can't be joined more than once!");
+			}
+		});
+		child1.setName("child1");
+		// Create a thread that calls join on child1
+		KThread child2 = new KThread(new Runnable() {
+			public void run() {
+				child1.join();
+				System.out.println("Child 1 should be finished." + (child1.status == statusFinished));
+			}
+		});
+		child2.setName("child2");
+		child2.fork();
+		child1.fork();
+		// Busy wait on main
+		for (int i = 0; i < 5; i++) {
+			System.out.println("busy...");
+			KThread.currentThread().yield();
+		}
+		// Main program call join on child 1 and this should trigger assert
+		boolean asserted = false;
+		try {
+			child1.join();
+		} catch (Error e) {
+			asserted = true;
+			System.out.println("Asserted on multiple join on child 1");
+		} finally {
+			try {
+				Lib.assertTrue(asserted);
+			} catch (Error e) {
+				System.out.println("***FAILED***");
+			} finally {
+				System.out.println("***PASSED***");
+			}
+		}
+	}
+
+	/**
+	 * Test for the situation that independent pairs of threads can join
+	 * with each other without interference.
+	 */
+	private static void joinTest5() {
+		System.out.println("Start join test 5.");
+		// Create a child thread
+		KThread main  = currentThread();
+		KThread child1 = new KThread(new Runnable() {
+			public void run() {
+				System.out.println("Join with the main thread");
+				currentThread().joinedFrom.join();
+				System.out.println("Not Printed");
+				System.out.println(currentThread());
+				Lib.assertTrue(currentThread().status == statusFinished);
+			}
+		});
+		child1.setName("child1");
+		child1.fork();
+		child1.join();
+		try {
+			Lib.assertTrue(child1.status == statusBlocked);
+		} catch (Error e) {
+			System.out.println("***FAILED***");
+		}
+		System.out.println("child 1 called main.join in it's process. Main continues to execute.");
+		System.out.println("***PASSED***");
+	}
+
+	/**
+	 * Test for the situation that a thread calls join on itself
+	 * and nachos asserts.
+	 */
+
+	private static void joinTest6() {
+		System.out.println("Start join test 6.");
+		boolean asserted = false;
+		try {
+			currentThread().join();
+		} catch(Error e) {
+			asserted = true;
+			System.out.println("Nachos asserted on call join on itself");
+		}
+		try {
+			Lib.assertTrue(asserted);
+		} catch (Error e) {
+			System.out.println("***FAILED***");
+		}
+		System.out.println("***PASSED***");
+	}
+
+	/**
 	 * Tests whether this module is working.
 	 */
 	public static void selfTest() {
@@ -415,6 +644,13 @@ public class KThread {
 
 		new KThread(new PingTest(1)).setName("forked thread").fork();
 		new PingTest(0).run();
+		// Run join tests
+		joinTest1();
+		joinTest2();
+		joinTest3();
+		joinTest4();
+		joinTest5();
+		joinTest6();
 	}
 
 	private static final char dbgThread = 't';
@@ -465,4 +701,8 @@ public class KThread {
 	private static KThread toBeDestroyed = null;
 
 	private static KThread idleThread = null;
+
+	private static HashSet<KThread> joinedThreads = new HashSet<>();
+
+	private KThread joinedFrom;
 }
