@@ -597,6 +597,7 @@ public class KThread {
 			public void run() {
 				System.out.println("Join with the main thread");
 				currentThread().joinedFrom.join();
+				System.out.println("Not Printed");
 				System.out.println(currentThread());
 				Lib.assertTrue(currentThread().status == statusFinished);
 			}
@@ -604,7 +605,35 @@ public class KThread {
 		child1.setName("child1");
 		child1.fork();
 		child1.join();
-		Lib.assertTrue(child1.status == statusBlocked);
+		try {
+			Lib.assertTrue(child1.status == statusBlocked);
+		} catch (Error e) {
+			System.out.println("***FAILED***");
+		}
+		System.out.println("child 1 called main.join in it's process. Main continues to execute.");
+		System.out.println("***PASSED***");
+	}
+
+	/**
+	 * Test for the situation that a thread calls join on itself
+	 * and nachos asserts.
+	 */
+
+	private static void joinTest6() {
+		System.out.println("Start join test 6.");
+		boolean asserted = false;
+		try {
+			currentThread().join();
+		} catch(Error e) {
+			asserted = true;
+			System.out.println("Nachos asserted on call join on itself");
+		}
+		try {
+			Lib.assertTrue(asserted);
+		} catch (Error e) {
+			System.out.println("***FAILED***");
+		}
+		System.out.println("***PASSED***");
 	}
 
 	/**
@@ -621,6 +650,7 @@ public class KThread {
 		joinTest3();
 		joinTest4();
 		joinTest5();
+		joinTest6();
 	}
 
 	private static final char dbgThread = 't';
