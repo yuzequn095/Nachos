@@ -53,7 +53,7 @@ public class Alarm {
 	 * should be run.
 	 */
 	public void timerInterrupt() {
-
+		KThread.currentThread().yield();
 		long currTime = Machine.timer().getTime();
 		boolean oriStatus = Machine.interrupt().disable(); // Turn off interrupter
 		TimeCompare timeCompare;
@@ -80,10 +80,14 @@ public class Alarm {
 	 * @see nachos.machine.Timer#getTime()
 	 */
 	public void waitUntil(long x) {
+		// for now, cheat just to get something working (busy waiting is bad)
+		long wakeTime = Machine.timer().getTime() + x;
+		while (wakeTime > Machine.timer().getTime())
+			KThread.yield();
 		boolean oriStatus = Machine.interrupt().disable(); // Turn off interrupter
-		long currTime = Machine.timer().getTime();
-		long wakeUpTime = currTime + x;
-		TimeCompare timeCompare = new TimeCompare(KThread.currentThread(), wakeUpTime);
+		//long currTime = Machine.timer().getTime();
+		//long wakeUpTime = currTime + x;
+		TimeCompare timeCompare = new TimeCompare(KThread.currentThread(), wakeTime);
 		timeQueue.add(timeCompare); // Add thread to the list
 		KThread.sleep(); // Sleep the thread
 		Machine.interrupt().restore(oriStatus); // Restore interrupter
