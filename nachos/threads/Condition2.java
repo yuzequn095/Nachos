@@ -51,6 +51,7 @@ public class Condition2 {
 		// Machine.interrupt().disable();
 		boolean intStatus = Machine.interrupt().disable();
 
+
 		// release lock after disable interrupt in case unexpect things happen
 		conditionLock.release();
 
@@ -80,12 +81,14 @@ public class Condition2 {
 		// Machine.interrupt().disable();
 		boolean intStatus = Machine.interrupt().disable();
 
+
 		// Check queue
 		if (!conditionQueue.isEmpty()) {
 			// get the first thread( at most one )
 			KThread wake_thread = conditionQueue.pollFirst();
 			// update status
 			wake_thread.ready();
+
 			ThreadedKernel.alarm.cancel(wake_thread); // break timer for part 4
 		}
 
@@ -104,12 +107,9 @@ public class Condition2 {
 		// disable interrupt first
 		// Machine.interrupt().disabled();
 		boolean intStatus = Machine.interrupt().disable();
-
-		// check queue
-		while (!conditionQueue.isEmpty()) {
-			wake(); // wake all threads in queue
-		}
-
+		// disable & enable in wake() already
+		// disable interrupt first
+		// Machine.interrupt().disabled();
 		// for each thread in queue
 		for( KThread each_thread:conditionQueue){
 			conditionQueue.remove(each_thread); // remove from waiting
@@ -142,6 +142,7 @@ public class Condition2 {
 
 		conditionLock.acquire();
 		Machine.interrupt().restore(intStatus);
+
 	}
 
 	private Lock conditionLock;
@@ -167,6 +168,7 @@ public class Condition2 {
 					// System.out.println("now wake");
 					cv.wake();   // signal
 					// System.out.println("now sleep");
+
 					cv.sleep();  // wait
 				}
 				lock.release();
@@ -199,7 +201,6 @@ public class Condition2 {
 			// for (int i = 0; i < 50; i++) { KThread.currentThread().yield(); }
 		}
 	}
-
 
 	// Place Condition2 test code inside of the Condition2 class.
 
@@ -275,7 +276,7 @@ public class Condition2 {
 		long t0 = Machine.timer().getTime();
 		System.out.println (KThread.currentThread().getName() + " sleeping");
 		// no other thread will wake us up, so we should time out
-		cv.sleepFor(2000);
+		cv.sleepFor(2);
 		long t1 = Machine.timer().getTime();
 		System.out.println (KThread.currentThread().getName() +
 				" woke up, slept for " + (t1 - t0) + " ticks");
