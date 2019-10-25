@@ -25,7 +25,7 @@ public class Alarm {
 		});
 	}
 
-	// Inner private class implements Comparable
+	// Private helper class
 	private class TimeCompare  implements Comparable<TimeCompare>{
 		private KThread thread;
 		private long time;
@@ -58,7 +58,7 @@ public class Alarm {
 		boolean oriStatus = Machine.interrupt().disable(); // Turn off interrupter
 		TimeCompare timeCompare;
 		for(java.util.Iterator i = timeQueue.iterator();i.hasNext();){
-			timeCompare = (TimeCompare) i.next(); // Get each thread from list to check
+			timeCompare = (TimeCompare) i.next(); // Get each comparable thread from list to check
 			if(timeCompare.time<=currTime){ // If reach wakeup time, remove and ready
 				i.remove();
 				timeCompare.thread.ready();
@@ -85,8 +85,6 @@ public class Alarm {
 		while (wakeTime > Machine.timer().getTime())
 			KThread.yield();
 		boolean oriStatus = Machine.interrupt().disable(); // Turn off interrupter
-		//long currTime = Machine.timer().getTime();
-		//long wakeUpTime = currTime + x;
 		TimeCompare timeCompare = new TimeCompare(KThread.currentThread(), wakeTime);
 		timeQueue.add(timeCompare); // Add thread to the list
 		KThread.sleep(); // Sleep the thread
@@ -95,14 +93,22 @@ public class Alarm {
 
 	/**
 	 * Cancel any timer set by <i>thread</i>, effectively waking
-	 * up the thread immediately (placing it in the scheduler
-	 * ready set) and returning true.  If <i>thread</i> has no
-	 * timer set, return false.
+	 * 	 * up the thread immediately (placing it in the scheduler
+	 * 	 * ready set) and returning true.  If <i>thread</i> has no
+	 * 	 * timer set, return false.
 	 * 
 	 * <p>
 	 * @param thread the thread whose timer should be cancelled.
 	 */
 	public boolean cancel(KThread thread) {
+		for(java.util.Iterator i = timeQueue.iterator();i.hasNext();){
+			TimeCompare timeCompare = (TimeCompare) i.next(); // Get each comparable thread from list to check
+			if(timeCompare.thread==thread){ // If the thread has timer set remove and ready
+				i.remove();
+				timeCompare.thread.ready();
+				return true;
+			}
+		}
 		return false;
 	}
 
