@@ -297,9 +297,9 @@ public class KThread {
 			this.joinedFrom = currentThread();
 			System.out.println("Joined from: " + this.joinedFrom);
 			joinedThreads.add(this);
-			if (this.status != statusReady) {
+/*			if (this.status != statusReady) {
 				this.ready();
-			}
+			}*/
 			sleep();
 			Machine.interrupt().enable();
 			return;
@@ -411,6 +411,13 @@ public class KThread {
 	protected void saveState() {
 		Lib.assertTrue(Machine.interrupt().disabled());
 		Lib.assertTrue(this == currentThread);
+	}
+
+	/**
+	 * Get the status
+	 */
+	protected int getStatus() {
+		return this.status;
 	}
 
 	private static class PingTest implements Runnable {

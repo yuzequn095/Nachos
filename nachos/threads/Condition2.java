@@ -3,6 +3,7 @@ package nachos.threads;
 import nachos.machine.*;
 
 import java.util.LinkedList;
+import java.util.concurrent.CancellationException;
 
 
 /**
@@ -22,6 +23,9 @@ public class Condition2 {
 	 * The current thread must hold this lock whenever it uses <tt>sleep()</tt>,
 	 * <tt>wake()</tt>, or <tt>wakeAll()</tt>.
 	 */
+
+	private static int statusReady = 1;
+
 	public Condition2(Lock conditionLock) {
 
 		this.conditionLock = conditionLock;
@@ -50,6 +54,7 @@ public class Condition2 {
 		// first we need to disable interrupt
 		// Machine.interrupt().disable();
 		boolean intStatus = Machine.interrupt().disable();
+
 
 		// release lock after disable interrupt in case unexpect things happen
 		conditionLock.release();
@@ -80,13 +85,18 @@ public class Condition2 {
 		// Machine.interrupt().disable();
 		boolean intStatus = Machine.interrupt().disable();
 
+
 		// Check queue
 		if (!conditionQueue.isEmpty()) {
 			// get the first thread( at most one )
 			KThread wake_thread = conditionQueue.pollFirst();
+			// System.out.println("Now thread: " + wake_thread.status);
 			// update status
-			wake_thread.ready();
 			ThreadedKernel.alarm.cancel(wake_thread); // break timer for part 4
+			if(wake_thread.getStatus() != statusReady) {
+				wake_thread.ready();
+			}
+
 		}
 
 		// enable interrupt
@@ -104,12 +114,9 @@ public class Condition2 {
 		// disable interrupt first
 		// Machine.interrupt().disabled();
 		boolean intStatus = Machine.interrupt().disable();
-
-		// check queue
-		while (!conditionQueue.isEmpty()) {
-			wake(); // wake all threads in queue
-		}
-
+		// disable & enable in wake() already
+		// disable interrupt first
+		// Machine.interrupt().disabled();
 		// for each thread in queue
 		for( KThread each_thread:conditionQueue){
 			conditionQueue.remove(each_thread); // remove from waiting
@@ -132,16 +139,29 @@ public class Condition2 {
 
 	// Will implement in part.4
 	public void sleepFor(long timeout) {
+
+		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+
 		boolean intStatus = Machine.interrupt().disable();
+
 		conditionLock.release();
+
 		KThread sleep_thread = KThread.currentThread();
 
 		conditionQueue.add(sleep_thread);
 
 		ThreadedKernel.alarm.waitUntil(timeout);
 
+		//ThreadedKernel.alarm.cancel(sleep_thread);
+
+		if(conditionQueue.contains(sleep_thread)){
+			conditionQueue.remove(sleep_thread);
+		}
+
 		conditionLock.acquire();
+
 		Machine.interrupt().restore(intStatus);
+
 	}
 
 	private Lock conditionLock;
@@ -167,6 +187,7 @@ public class Condition2 {
 					// System.out.println("now wake");
 					cv.wake();   // signal
 					// System.out.println("now sleep");
+
 					cv.sleep();  // wait
 				}
 				lock.release();
@@ -199,7 +220,6 @@ public class Condition2 {
 			// for (int i = 0; i < 50; i++) { KThread.currentThread().yield(); }
 		}
 	}
-
 
 	// Place Condition2 test code inside of the Condition2 class.
 
@@ -282,12 +302,98 @@ public class Condition2 {
 		lock.release();
 	}
 
+
+
+	private static class sleepForTest2 {
+		private static Lock lock;
+		private static Condition2 cv;
+
+		private static class sleepT implements Runnable {
+			public void run () {
+				lock.acquire();
+
+				long t0 = Machine.timer().getTime();
+				System.out.println("t0: " + t0);
+
+				System.out.println("I am a thread and going to sleep.");
+				System.out.println (KThread.currentThread().getName() + " sleeping");
+				cv.sleepFor(500000000);
+				// cv.wake();
+				// ThreadedKernel.alarm.cancel(KThread.currentThread());
+
+				long t1 = Machine.timer().getTime();
+				System.out.println("t1: " + t1);
+
+				System.out.println (KThread.currentThread().getName() +
+						" woke up, slept for " + (t1 - t0) + " ticks");
+
+
+				lock.release();
+
+			}
+		}
+
+		private static class wakeT implements Runnable {
+			public void run () {
+				lock.acquire();
+
+				//long t0 = Machine.timer().getTime();
+				//System.out.println("t0: " + t0);
+
+				System.out.println("I am a thread and going to wakeup.");
+				//System.out.println (KThread.currentThread().getName() + " sleeping");
+				//cv.sleepFor(500000000);
+				cv.wake();
+				// ThreadedKernel.alarm.cancel(KThread.currentThread());
+
+				//long t1 = Machine.timer().getTime();
+				//System.out.println("t1: " + t1);
+
+				//System.out.println (KThread.currentThread().getName() +
+						//" woke up, slept for " + (t1 - t0) + " ticks");
+
+
+				lock.release();
+
+			}
+		}
+
+		public sleepForTest2 () {
+			System.out.println("Testing");
+			lock = new Lock();
+			cv = new Condition2(lock);
+
+			//lock.acquire();
+
+			KThread sl = new KThread(new sleepT());
+			sl.setName("sl");
+			KThread sw = new KThread(new wakeT());
+			sw.setName("wk");
+
+
+			// System.out.println("gonna fork");
+			sl.fork();
+			sw.fork();
+
+			// System.out.println("gonna join");
+			sl.join();
+			sw.join();
+
+			// cv.wake();
+
+			//lock.release();
+
+		}
+	}
+
+
 	// Invoke Condition2.selfTest() from ThreadedKernel.selfTest()
 
 	public static void selfTest() {
 		System.out.println("Start test");
 		// new InterlockTest();
 		// cvTest5();
-		sleepForTest1();
+		// sleepForTest1();
+		new sleepForTest2();
 	}
 }
