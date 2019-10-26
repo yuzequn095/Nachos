@@ -118,13 +118,20 @@ public class Condition2 {
 		// disable interrupt first
 		// Machine.interrupt().disabled();
 		// for each thread in queue
-		for( KThread each_thread:conditionQueue){
+/*		for( KThread each_thread:conditionQueue){
 			conditionQueue.remove(each_thread); // remove from waiting
-			each_thread.ready(); // update status
+			//each_thread.ready(); // update status
 			ThreadedKernel.alarm.cancel(each_thread);// for part 4
+			if(each_thread.getStatus() != statusReady) {
+				each_thread.ready();
+			}
 		}
+*/
 
-		// enable interrupt
+		while( !conditionQueue.isEmpty() ){
+			wake();
+		}
+// enable interrupt
 		Machine.interrupt().restore(intStatus);
 	}
 
@@ -308,14 +315,14 @@ public class Condition2 {
 		private static Lock lock;
 		private static Condition2 cv;
 
-		private static class sleepT implements Runnable {
+		private static class sleepT1 implements Runnable {
 			public void run () {
 				lock.acquire();
 
 				long t0 = Machine.timer().getTime();
 				System.out.println("t0: " + t0);
 
-				System.out.println("I am a thread and going to sleep.");
+				System.out.println("I am a thread 1 and going to sleep.");
 				System.out.println (KThread.currentThread().getName() + " sleeping");
 				cv.sleepFor(500000000);
 				// cv.wake();
@@ -333,6 +340,56 @@ public class Condition2 {
 			}
 		}
 
+		private static class sleepT2 implements Runnable {
+			public void run () {
+				lock.acquire();
+
+				long t2 = Machine.timer().getTime();
+				System.out.println("t2: " + t2);
+
+				System.out.println("I am a thread 2 and going to sleep.");
+				System.out.println (KThread.currentThread().getName() + " sleeping");
+				cv.sleepFor(500000000);
+				// cv.wake();
+				// ThreadedKernel.alarm.cancel(KThread.currentThread());
+
+				long t3 = Machine.timer().getTime();
+				System.out.println("t3: " + t3);
+
+				System.out.println (KThread.currentThread().getName() +
+						" woke up, slept for " + (t3 - t2) + " ticks");
+
+
+				lock.release();
+
+			}
+		}
+
+		private static class sleepT3 implements Runnable {
+			public void run () {
+				lock.acquire();
+
+				long t4 = Machine.timer().getTime();
+				System.out.println("t4: " + t4);
+
+				System.out.println("I am a thread 3 and going to sleep.");
+				System.out.println (KThread.currentThread().getName() + " sleeping");
+				cv.sleepFor(500000000);
+				// cv.wake();
+				// ThreadedKernel.alarm.cancel(KThread.currentThread());
+
+				long t5 = Machine.timer().getTime();
+				System.out.println("t5: " + t5);
+
+				System.out.println (KThread.currentThread().getName() +
+						" woke up, slept for " + (t5 - t4) + " ticks");
+
+
+				lock.release();
+
+			}
+		}
+
 		private static class wakeT implements Runnable {
 			public void run () {
 				lock.acquire();
@@ -343,7 +400,7 @@ public class Condition2 {
 				System.out.println("I am a thread and going to wakeup.");
 				//System.out.println (KThread.currentThread().getName() + " sleeping");
 				//cv.sleepFor(500000000);
-				cv.wake();
+				cv.wakeAll();
 				// ThreadedKernel.alarm.cancel(KThread.currentThread());
 
 				//long t1 = Machine.timer().getTime();
@@ -365,18 +422,26 @@ public class Condition2 {
 
 			//lock.acquire();
 
-			KThread sl = new KThread(new sleepT());
-			sl.setName("sl");
+			KThread sl1 = new KThread(new sleepT1());
+			sl1.setName("sl1");
+			KThread sl2 = new KThread(new sleepT2());
+			sl2.setName("sl2");
+			KThread sl3 = new KThread(new sleepT3());
+			sl3.setName("sl3");
 			KThread sw = new KThread(new wakeT());
 			sw.setName("wk");
 
 
 			// System.out.println("gonna fork");
-			sl.fork();
+			sl1.fork();
+			sl2.fork();
+			sl3.fork();
 			sw.fork();
 
 			// System.out.println("gonna join");
-			sl.join();
+			sl1.join();
+			sl2.join();
+			sl3.join();
 			sw.join();
 
 			// cv.wake();
