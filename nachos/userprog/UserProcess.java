@@ -28,6 +28,10 @@ public class UserProcess {
 		pageTable = new TranslationEntry[numPhysPages];
 		for (int i = 0; i < numPhysPages; i++)
 			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+
+		fileDescriptors = new OpenFile[16];
+		fileDescriptors[0] = UserKernel.console.openForReading();
+		fileDescriptors[1] = UserKernel.console.openForWriting();
 	}
 
 	/**
@@ -374,6 +378,293 @@ public class UserProcess {
 		return 0;
 	}
 
+	/****************************PART 1 START****************************/
+	// TODO
+	/**
+	 * Handle the creat() system call.
+	 *
+	 * Attempt to open the named disk file, creating it if it does not exist,
+	 * and return a file descriptor that can be used to access the file. If
+	 * the file already exists, creat truncates it.
+	 *
+	 * Note that creat() can only be used to create files on disk; creat() will
+	 * never return a file descriptor referring to a stream.
+	 *
+	 * Returns the new file descriptor, or -1 if an error occurred.
+	 */
+	private int handleCreat(int name) {
+		String fileName = readVirtualMemoryString(name, 256);
+		if (fileName==null) {
+			System.out.println("handleCreat: No fileName found from Virtual Memory.");
+			return -1;
+		}
+		OpenFile openFile = Machine.stubFileSystem().open(fileName, true);
+		if (openFile==null) {
+			System.out.println("handleCreat: No file of fileName found from fileSystem.");
+			return -1;
+		} else {
+			for (int i=2; i<fileDescriptors.length; i++) {
+				if (fileDescriptors[i]==null) {
+					fileDescriptors[i] = openFile;
+					return i;
+				}
+			}
+			openFile.close();
+			System.out.println("handleCreat: fileDescriptors reaches the max capacity.");
+			return -1;
+		}
+	}
+
+	/**
+	 * Handle the open() system call.
+	 *
+	 * Attempt to open the named file and return a file descriptor.
+	 *
+	 * Note that open() can only be used to open files on disk; open() will never
+	 * return a file descriptor referring to a stream.
+	 *
+	 * Returns the new file descriptor, or -1 if an error occurred.
+	 */
+	private int handleOpen(int name) {
+		String fileName = readVirtualMemoryString(name, 256);
+		if (fileName==null) {
+			System.out.println("handleOpen: No fileName found from Virtual Memory.");
+			return -1;
+		}
+		OpenFile openFile = Machine.stubFileSystem().open(fileName, false);
+		if (openFile==null) {
+			System.out.println("handleOpen: No file of fileName found from fileSystem.");
+			return -1;
+		} else {
+			for (int i=2; i<fileDescriptors.length; i++) {
+				if (fileDescriptors[i]==null) {
+					fileDescriptors[i] = openFile;
+					return i;
+				}
+			}
+			openFile.close();
+			System.out.println("handleOpen: fileDescriptors reaches the max capacity.");
+			return -1;
+		}
+	}
+
+	/**
+	 * Handle the read() system call.
+	 *
+	 * Attempt to read up to count bytes into buffer from the file or stream
+	 * referred to by fileDescriptor.
+	 *
+	 * On success, the number of bytes read is returned. If the file descriptor
+	 * refers to a file on disk, the file position is advanced by this number.
+	 *
+	 * It is not necessarily an error if this number is smaller than the number of
+	 * bytes requested. If the file descriptor refers to a file on disk, this
+	 * indicates that the end of the file has been reached. If the file descriptor
+	 * refers to a stream, this indicates that the fewer bytes are actually
+	 * available right now than were requested, but more bytes may become available
+	 * in the future. Note that read() never waits for a stream to have more data;
+	 * it always returns as much as possible immediately.
+	 *
+	 * On error, -1 is returned, and the new file position is undefined. This can
+	 * happen if fileDescriptor is invalid, if part of the buffer is read-only or
+	 * invalid, or if a network stream has been terminated by the remote host and
+	 * no more data is available.
+	 */
+	private int handleRead(int fileDescriptor, int buffer, int count) {
+		if (fileDescriptor<=1 || fileDescriptor>15) {
+			System.out.println("handleRead: fileDescriptor is invalid.");
+			return -1;
+		}
+		OpenFile openFile = fileDescriptors[fileDescriptor];
+		if (openFile==null) {
+			System.out.println("handleRead: there is no file at given fileDescriptor.");
+			return -1;
+		}
+		byte[] buf = new byte[pageSize];
+		int readCount = 0;
+		while (count > pageSize) {
+			int oneTurnRead = openFile.read(buf,0,pageSize);
+			if (oneTurnRead == 0 ) return readCount;
+			if (oneTurnRead < 0) {
+				System.out.println("handleRead: openFile read method failure.");
+				return -1;
+			}
+			// Write
+			int oneTurnWrite = writeVirtualMemory(buffer,buf,0,oneTurnRead);
+			if (oneTurnRead!=oneTurnWrite) {
+				System.out.println("handleRead: write onto VM failure.");
+				return -1;
+			}
+			buffer += oneTurnRead;
+			readCount += oneTurnRead;
+			count -= oneTurnRead;
+		}
+		int oneTurnRead = openFile.read(buf,0,count);
+		if (oneTurnRead < 0) {
+			System.out.println("handleRead: openFile read method failure.");
+			return -1;
+		}
+		int oneTurnWrite = writeVirtualMemory(buffer,buf,0,oneTurnRead);
+		if (oneTurnRead!=oneTurnWrite) {
+			System.out.println("handleRead: write onto VM failure.");
+			return -1;
+		}
+		readCount += oneTurnRead;
+		count -= oneTurnRead;
+		if (count!=0) {
+			System.out.println("handleRead: not finish reading all.");
+			return -1;
+		}
+		return readCount;
+	}
+
+	/**
+	 * Handle the write() system call.
+	 *
+	 * Attempt to write up to count bytes from buffer to the file or stream
+	 * referred to by fileDescriptor. write() can return before the bytes are
+	 * actually flushed to the file or stream. A write to a stream can block,
+	 * however, if kernel queues are temporarily full.
+	 *
+	 * On success, the number of bytes written is returned (zero indicates nothing
+	 * was written), and the file position is advanced by this number. It IS an
+	 * error if this number is smaller than the number of bytes requested. For
+	 * disk files, this indicates that the disk is full. For streams, this
+	 * indicates the stream was terminated by the remote host before all the data
+	 * was transferred.
+	 *
+	 * On error, -1 is returned, and the new file position is undefined. This can
+	 * happen if fileDescriptor is invalid, if part of the buffer is invalid, or
+	 * if a network stream has already been terminated by the remote host.
+	 */
+	private int handleWrite(int fileDescriptor, int buffer, int count) {
+		if (fileDescriptor<=1 || fileDescriptor>15) {
+			System.out.println("handleWrite: fileDescriptor is invalid.");
+			return -1;
+		}
+		OpenFile openFile = fileDescriptors[fileDescriptor];
+		if (openFile==null) {
+			System.out.println("handleWrite: there is no file at given fileDescriptor.");
+			return -1;
+		}
+		byte[] buf = new byte[pageSize];
+		int writeCount = 0;
+		while (count > pageSize) {
+			int oneTurnRead = readVirtualMemory(buffer,buf);
+			int oneTurnWrite = openFile.write(buf,0,oneTurnRead);
+			if (oneTurnWrite == 0 ) return writeCount;
+			if (oneTurnWrite < 0) {
+				System.out.println("handleWrite: openFile write method failure.");
+				return -1;
+			}
+			if (oneTurnRead!=oneTurnWrite) {
+				System.out.println("handleWrite: not match read from VM failure.");
+				return -1;
+			}
+			buffer += oneTurnWrite;
+			writeCount += oneTurnWrite;
+			count -= oneTurnWrite;
+		}
+		int oneTurnRead = readVirtualMemory(buffer,buf);
+		int oneTurnWrite = openFile.write(buf,0,oneTurnRead);
+		if (oneTurnWrite < 0) {
+			System.out.println("handleWrite: openFile write method failure.");
+			return -1;
+		}
+		if (oneTurnRead!=oneTurnWrite) {
+			System.out.println("handleWrite: not match read from VM failure.");
+			return -1;
+		}
+		writeCount += oneTurnWrite;
+		count -= oneTurnWrite;
+		if (count!=0) {
+			System.out.println("handleWrite: not finish writing all.");
+			return -1;
+		}
+		return writeCount;
+	}
+
+	/**
+	 * Handle the close() system call.
+	 *
+	 * Close a file descriptor, so that it no longer refers to any file or
+	 * stream and may be reused. The resources associated with the file
+	 * descriptor are released.
+	 *
+	 * Returns 0 on success, or -1 if an error occurred.
+	 */
+	private int handleClose(int fileDescriptor) {
+		if (fileDescriptor<=1 || fileDescriptor>15 || fileDescriptors[fileDescriptor]==null) {
+			System.out.println("handleClose: fileDescriptor is invalid or no file at given fileDescriptor.");
+			return -1;
+		}
+		fileDescriptors[fileDescriptor].close();
+		fileDescriptors[fileDescriptor] = null;
+		return 0;
+	}
+
+	/**
+	 * Handle the unlink() system call.
+	 *
+	 * Delete a file from the file system.
+	 *
+	 * If another process has the file open, the underlying file system
+	 * implementation in StubFileSystem will cleanly handle this situation
+	 * (this process will ask the file system to remove the file, but the
+	 * file will not actually be deleted by the file system until all
+	 * other processes are done with the file).
+	 *
+	 * Returns 0 on success, or -1 if an error occurred.
+	 */
+	private int handleUnlink(int name) {
+		String fileName = readVirtualMemoryString(name, 256);
+		if (fileName==null) {
+			System.out.println("handleUnlink: No fileName found from Virtual Memory.");
+			return -1;
+		}
+		int fileDescriptor = -1;
+		for (int i=2; i<fileDescriptors.length; i++) {
+			if (fileDescriptors[i].getName()==fileName) {
+				fileDescriptor = i;
+			}
+		}
+		if (fileDescriptor==-1) {
+			System.out.println("handleUnlink: No fileName found from fileDescriptor.");
+			return -1;
+		}
+		int isClosed = handleClose(fileDescriptor);
+		boolean isRemoved = ThreadedKernel.fileSystem.remove(fileName);
+		if (isRemoved && isClosed==0) {
+			return 0;
+		} else {
+			System.out.println("handleUnlink: Unlink failed.");
+			return -1;
+		}
+	}
+
+	/****************************PART 1 END****************************/
+
+
+	/****************************PART 3 START****************************/
+	// TODO
+	/**
+	 * Handle the exec() system call.
+	 */
+	private int handleExec(int file, int argc, int argv) {
+
+		return 0;
+	}
+
+	/**
+	 * Handle the join() system call.
+	 */
+	private int handleJoin(int processID, int status) {
+
+		return 0;
+	}
+
+	/****************************PART 3 END****************************/
+
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
 			syscallRead = 6, syscallWrite = 7, syscallClose = 8,
@@ -446,6 +737,26 @@ public class UserProcess {
 			return handleHalt();
 		case syscallExit:
 			return handleExit(a0);
+		/** PART 1 **/
+		// TODO
+		case syscallCreate:
+			return handleCreat(a0);
+		case syscallOpen:
+			return handleOpen(a0);
+		case syscallRead:
+			return handleRead(a0,a1,a2);
+		case syscallWrite:
+			return handleWrite(a0,a1,a2);
+		case syscallClose:
+			return handleClose(a0);
+		case syscallUnlink:
+			return handleUnlink(a0);
+		/** PART 3 **/
+		// TODO
+		case syscallExec:
+			return handleExec(a0,a1,a2);
+		case syscallJoin:
+			return handleJoin(a0,a1);
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
@@ -495,7 +806,10 @@ public class UserProcess {
 	protected final int stackPages = 8;
 
 	/** The thread that executes the user-level program. */
-        protected UThread thread;
+	protected UThread thread;
+
+	/** The array contains all fileDescriptor. */
+	protected OpenFile[] fileDescriptors;
     
 	private int initialPC, initialSP;
 
