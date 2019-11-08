@@ -223,7 +223,7 @@ public final class Machine {
 		Class clsThreadedKernel = Lib
 				.loadClass("nachos.threads.ThreadedKernel");
 		Class clsKThread = Lib.loadClass("nachos.threads.KThread");
-		Class clsCommunicator = Lib.loadClass("nachos.threads.Communicator");
+		//Class clsCommunicator = Lib.loadClass("nachos.threads.Communicator");
 		Class clsSemaphore = Lib.loadClass("nachos.threads.Semaphore");
 		Class clsLock = Lib.loadClass("nachos.threads.Lock");
 		Class clsCondition = Lib.loadClass("nachos.threads.Condition");
@@ -260,10 +260,10 @@ public final class Machine {
 
 		Lib.checkField(clsKThread, "schedulingState", clsObject);
 
-		Lib.checkConstructor(clsCommunicator, new Class[] {});
-		Lib.checkMethod(clsCommunicator, "speak", new Class[] { int.class },
-				void.class);
-		Lib.checkMethod(clsCommunicator, "listen", new Class[] {}, int.class);
+		//Lib.checkConstructor(clsCommunicator, new Class[] {});
+		//Lib.checkMethod(clsCommunicator, "speak", new Class[] { int.class },
+		//void.class);
+                //Lib.checkMethod(clsCommunicator, "listen", new Class[] {}, int.class);
 
 		Lib.checkConstructor(clsSemaphore, new Class[] { int.class });
 		Lib.checkMethod(clsSemaphore, "P", new Class[] {}, void.class);
