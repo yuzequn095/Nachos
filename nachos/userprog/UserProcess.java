@@ -6,6 +6,7 @@ import nachos.userprog.*;
 import nachos.vm.*;
 
 import java.io.EOFException;
+import java.util.NoSuchElementException;
 
 /**
  * Encapsulates the state of a user process that is not contained in its user
@@ -24,14 +25,19 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
-		int numPhysPages = Machine.processor().getNumPhysPages();
-		pageTable = new TranslationEntry[numPhysPages];
-		for (int i = 0; i < numPhysPages; i++)
-			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-
+//		int numPhysPages = Machine.processor().getNumPhysPages();
+		// Will be initialized later
+		pageTable = null;
+		UserKernel.pidCounterMutex.acquire();
+		pid = UserKernel.pidCounter++;
+		UserKernel.pidCounterMutex.release();
+//		// dummy
+//		for (int i = 0; i < numPhysPages; i++)
+//			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
 		fileDescriptors = new OpenFile[16];
 		fileDescriptors[0] = UserKernel.console.openForReading();
 		fileDescriptors[1] = UserKernel.console.openForWriting();
+
 	}
 
 	/**
@@ -303,8 +309,12 @@ public class UserProcess {
 			Lib.debug(dbgProcess, "\tinsufficient physical memory");
 			return false;
 		}
-
+		// initialize page table
+		pageTable = new TranslationEntry[numPages];
+		// acquire the lock before loading
+		UserKernel.pagesAvailableMutex.acquire();
 		// load sections
+		int counter = 0;
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
 
@@ -313,12 +323,42 @@ public class UserProcess {
 
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
-
+				// get the first available ppn and assign to the page
+				boolean readOnly = section.isReadOnly();
+				// acquire the lock before loading
+				UserKernel.pagesAvailableMutex.acquire();
+				try {
+					int ppn = UserKernel.pagesAvailable.removeLast();
+					section.loadPage(i, ppn);
+					pageTable[counter] = new TranslationEntry(vpn, ppn, true, readOnly, false, false);
+				} catch (NoSuchElementException e){
+					System.out.println("No available physical page for process " + pid);
+					unloadSections();
+					UserKernel.pagesAvailableMutex.release();
+					return false;
+				}
+				UserKernel.pagesAvailableMutex.release();
 				// for now, just assume virtual addresses=physical addresses
-				section.loadPage(i, vpn);
+				counter++;
 			}
 		}
-
+		// debug
+		Lib.assertTrue(counter == numPages - 9);
+		// load stack pages and argument page, 9 pages in total
+		for (int i = counter; i < numPages; i++) {
+			// acquire the lock before loading
+			UserKernel.pagesAvailableMutex.acquire();
+			try {
+				int ppn = UserKernel.pagesAvailable.removeLast();
+				pageTable[counter] = new TranslationEntry(i, ppn, true, false, false, false);
+			} catch (NoSuchElementException e){
+				System.out.println("No available physical page for process" + pid);
+				unloadSections();
+				UserKernel.pagesAvailableMutex.release();
+				return false;
+			}
+			UserKernel.pagesAvailableMutex.release();
+		}
 		return true;
 	}
 
@@ -326,6 +366,17 @@ public class UserProcess {
 	 * Release any resources allocated by <tt>loadSections()</tt>.
 	 */
 	protected void unloadSections() {
+		for (int i = 0; i < pageTable.length; i++){
+			if (pageTable[i] == null || !pageTable[i].valid){
+				continue;
+			}
+			int ppn = pageTable[i].ppn;
+			// acquire mutex lock
+			UserKernel.pagesAvailableMutex.acquire();
+			UserKernel.pagesAvailable.add(ppn);
+			UserKernel.pagesAvailableMutex.release();
+			pageTable[i] = null;
+		}
 	}
 
 	/**
@@ -810,6 +861,8 @@ public class UserProcess {
 
 	/** The array contains all fileDescriptor. */
 	protected OpenFile[] fileDescriptors;
+
+	private int pid;
     
 	private int initialPC, initialSP;
 
@@ -818,4 +871,5 @@ public class UserProcess {
 	private static final int pageSize = Processor.pageSize;
 
 	private static final char dbgProcess = 'a';
+
 }
