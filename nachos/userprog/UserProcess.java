@@ -7,6 +7,9 @@ import nachos.vm.*;
 
 import java.awt.print.Pageable;
 import java.io.EOFException;
+import java.io.FileDescriptor;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.NoSuchElementException;
 
 /**
@@ -38,6 +41,12 @@ public class UserProcess {
 		fileDescriptors = new OpenFile[16];
 		fileDescriptors[0] = UserKernel.console.openForReading();
 		fileDescriptors[1] = UserKernel.console.openForWriting();
+
+		//part 3
+		childrenExitStatus = new HashMap<>();
+		children = new HashMap<>();
+		parent = null;
+		joinCV = new Condition(UserKernel.joinMutex);
 
 	}
 
@@ -79,7 +88,9 @@ public class UserProcess {
 
 		thread = new UThread(this);
 		thread.setName(name).fork();
-
+		UserKernel.runningProcessCounterMutex.acquire();
+		UserKernel.runningProcessCounter++;
+		UserKernel.runningProcessCounterMutex.release();
 		return true;
 	}
 
@@ -503,11 +514,14 @@ public class UserProcess {
 	 * Handle the halt() system call.
 	 */
 	private int handleHalt() {
+		if (pid == 0) {
 
-		Machine.halt();
+			Machine.halt();
 
-		Lib.assertNotReached("Machine.halt() did not halt machine!");
-		return 0;
+			Lib.assertNotReached("Machine.halt() did not halt machine!");
+			return 0;
+		}
+		return -1;
 	}
 
 	/**
@@ -519,10 +533,43 @@ public class UserProcess {
 		// ...and leave it as the top of handleExit so that we
 		// can grade your implementation.
 
+		// close all file descriptors
+		for (OpenFile openedFile : fileDescriptors) {
+			if (openedFile != null) {
+				openedFile.close();
+				openedFile = null; //need to clear descriptor?
+			}
+		}
+		// unload sections
+		unloadSections();
+		//close coff
+		coff.close();
+		// save exit status to childrenExitStatus
+		if (parent != null){
+			if(exception) {
+				parent.childrenExitStatus.put(this, null);
+			} else{
+				parent.childrenExitStatus.put(this, status);
+			}
+			// should wake join cv?
+			UserKernel.joinMutex.acquire();
+			parent.joinCV.wake();
+			UserKernel.joinMutex.release();
+		}
+		// set parent of this process's children to null
+		for (UserProcess child : children.values()) {
+			child.parent = null;
+		}
+		// check if this process is the last process
+		UserKernel.runningProcessCounterMutex.acquire();
+		if (--UserKernel.runningProcessCounter == 0) {
+			// terminate kernal
+			Kernel.kernel.terminate();
+		}
+		UserKernel.runningProcessCounterMutex.release();
+		KThread.finish();
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
-		Kernel.kernel.terminate();
-
 		return 0;
 	}
 
@@ -800,15 +847,84 @@ public class UserProcess {
 	 */
 	private int handleExec(int file, int argc, int argv) {
 
-		return 0;
+		//check inputs
+		if (argc < 0) {
+			System.out.println("Invalid input for handleExec, argc < 0");
+			return -1;
+		}
+		String filename = readVirtualMemoryString(file,256);
+		if (filename == null) {
+			System.out.println("Invalid filename for handleExec");
+			return -1;
+		}
+		if (filename.length() < 5) {
+			System.out.println("Invalid filename length, length["+filename.length()+"] < 5");
+		}
+		String extension = filename.substring(filename.length()-5, filename.length());
+		if (extension != ".coff") {
+			System.out.println("Invalid filename extension, extension["+extension+"] is not .coff");
+		}
+
+		// read arguments
+		String[] args = new String[argc];
+		byte[] argBuffer = new byte[4];
+		for (int i = 0; i < argc; i++) {
+			readVirtualMemory(argv + i * 4, argBuffer);
+			String cur_arg = readVirtualMemoryString(Lib.bytesToInt(argBuffer, 0),256);
+			// check for null argument
+			if (cur_arg == null){
+				System.out.println("invalid argument from memory, argument is null");
+				return -1;
+			}
+			args[i] = cur_arg;
+		}
+
+		// create child process
+		UserProcess child = new UserProcess();
+		// child is not exited so no exit status
+		children.put(child.pid, child);
+		child.parent = this;
+		// try execute the child
+		if (!child.execute(filename, args)) {
+			System.out.println("Child execution unsuccessful");
+			//childrenStatus.remove(child);
+			return -1;
+		}
+		// Increment of runningProcessCounter in execute
+		return child.pid;
 	}
 
 	/**
 	 * Handle the join() system call.
 	 */
 	private int handleJoin(int processID, int status) {
+		// check if the pid belongs to a child process(valid)
+		// out of address space?
+		if (!children.containsKey(processID)) {
+			System.out.println("handleJoin: Invalid pid [" + processID + "], either the pid doesn't belong to a child process or it has been joined");
+			return -1;
+		}
 
-		return 0;
+		UserProcess child = children.get(processID);
+
+		// check if the child is finished
+		if (!childrenExitStatus.containsKey(child)) {
+			UserKernel.joinMutex.acquire();
+			joinCV.sleep();
+			UserKernel.joinMutex.release();
+		}
+
+		// save the children's exit status if it has one
+		Integer exitStatus = childrenExitStatus.get(child);
+		if (exitStatus == null) {
+			// indicates an exit from unhandled exception
+			System.out.println("handleJoin: Child [" + processID + "] exited due to unhandled exception, returning 0.");
+			return 0;
+		}
+		byte[] buffer = Lib.bytesFromInt(exitStatus);
+		writeVirtualMemory(status, buffer);
+		System.out.println("handleJoin: Child [" + processID + "] exited with status[" + exitStatus + "], returning 1.");
+		return 1;
 	}
 
 	/****************************PART 3 END****************************/
@@ -938,6 +1054,9 @@ public class UserProcess {
 			Lib.debug(dbgProcess, "Unexpected exception: "
 					+ Processor.exceptionNames[cause]);
 			Lib.assertNotReached("Unexpected exception");
+			// trigger flag
+			exception = true;
+			handleExit(cause);
 		}
 	}
 
@@ -968,5 +1087,19 @@ public class UserProcess {
 	private static final int pageSize = Processor.pageSize;
 
 	private static final char dbgProcess = 'a';
+
+	/** Part 3 */
+	private HashMap<UserProcess, Integer> childrenExitStatus;
+
+	private HashMap<Integer, UserProcess> children;
+
+	private UserProcess parent;
+
+	private boolean exception = false;
+
+	// each process sleeps/wakes on it's own cv
+	private Condition joinCV;
+
+
 
 }

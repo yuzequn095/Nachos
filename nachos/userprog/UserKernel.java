@@ -31,6 +31,7 @@ public class UserKernel extends ThreadedKernel {
 			}
 		});
 		pidCounter = 0;
+		runningProcessCounter = 0;
 	}
 
 	private void getAvailablePages() {
@@ -140,4 +141,10 @@ public class UserKernel extends ThreadedKernel {
 	protected static int pidCounter;
 
 	protected static Lock pidCounterMutex = new Lock();
+
+	protected static int runningProcessCounter;
+
+	protected static Lock runningProcessCounterMutex = new Lock();
+
+	protected static Lock joinMutex = new Lock();
 }
