@@ -5,7 +5,12 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
+import java.awt.print.Pageable;
 import java.io.EOFException;
+import java.io.FileDescriptor;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.NoSuchElementException;
 
 /**
  * Encapsulates the state of a user process that is not contained in its user
@@ -24,14 +29,25 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
-		int numPhysPages = Machine.processor().getNumPhysPages();
-		pageTable = new TranslationEntry[numPhysPages];
-		for (int i = 0; i < numPhysPages; i++)
-			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-
+//		int numPhysPages = Machine.processor().getNumPhysPages();
+		// Will be initialized later
+		pageTable = null;
+		UserKernel.pidCounterMutex.acquire();
+		pid = UserKernel.pidCounter++;
+		UserKernel.pidCounterMutex.release();
+//		// dummy
+//		for (int i = 0; i < numPhysPages; i++)
+//			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
 		fileDescriptors = new OpenFile[16];
 		fileDescriptors[0] = UserKernel.console.openForReading();
 		fileDescriptors[1] = UserKernel.console.openForWriting();
+
+		//part 3
+		childrenExitStatus = new HashMap<>();
+		children = new HashMap<>();
+		parent = null;
+		joinCV = new Condition(UserKernel.joinMutex);
+
 	}
 
 	/**
@@ -72,7 +88,9 @@ public class UserProcess {
 
 		thread = new UThread(this);
 		thread.setName(name).fork();
-
+		UserKernel.runningProcessCounterMutex.acquire();
+		UserKernel.runningProcessCounter++;
+		UserKernel.runningProcessCounterMutex.release();
 		return true;
 	}
 
@@ -146,19 +164,66 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
-		Lib.assertTrue(offset >= 0 && length >= 0
-				&& offset + length <= data.length);
-
-		byte[] memory = Machine.processor().getMemory();
-
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
+		// check offset and length
+		if(offset >= 0 && length >= 0 && offset + length <= data.length){
+			System.out.println("invalid offset or/and length");
 			return 0;
-
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(memory, vaddr, data, offset, amount);
-
-		return amount;
+		}
+		byte[] memory = Machine.processor().getMemory();
+		//check vaddr
+		if (vaddr < 0 || vaddr > pageTable.length * pageSize) {
+			System.out.println("invalid vaddr");
+			return 0;
+		}
+		// initialize variables
+		int initialVPN = Processor.pageFromAddress(vaddr);	//this variable won't be updated
+		if (initialVPN >= pageTable.length) {
+			System.out.println("invalid initial vaddr, vpn out of bounds");
+			return 0;
+		}
+		TranslationEntry entry = pageTable[initialVPN];
+		int pageOffset = Processor.offsetFromAddress(vaddr);
+		int paddr = entry.ppn * pageSize + pageOffset;
+		int amount = 0;
+		int totalRead = 0;
+		// before the loop nothing is copied, variables should be at initial value
+		// each iteration should read a new page
+		while (totalRead < length) {
+			// check paddr
+			if (paddr < 0 || paddr >= memory.length) {
+				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalRead;
+			}
+			// check if the page is valid
+			if (!entry.valid) {
+				System.out.println("invalid page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalRead;
+			}
+			// update amount, only updated once
+			amount = Math.min(length - totalRead, pageSize - pageOffset);
+			// actual copy
+			System.arraycopy(memory, paddr, data, offset, amount);
+			// update vaddr->entry->pageOffset->paddr
+			vaddr += amount;
+			int curVPN = Processor.pageFromAddress(vaddr);
+			if (curVPN >= pageTable.length) {
+				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				return totalRead;
+			}
+			// for debug
+			TranslationEntry entryOld = entry;
+			entry = pageTable[Processor.pageFromAddress(vaddr)];
+			// debug
+			Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
+			pageOffset = Processor.offsetFromAddress(vaddr);
+			// debug
+			Lib.assertTrue(pageOffset == 0);
+			paddr = entry.ppn * pageSize + pageOffset;
+			// update cumulative variables
+			offset += amount;
+			totalRead += amount;
+		}
+		return totalRead;
 	}
 
 	/**
@@ -188,19 +253,68 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 	public int writeVirtualMemory(int vaddr, byte[] data, int offset, int length) {
-		Lib.assertTrue(offset >= 0 && length >= 0
-				&& offset + length <= data.length);
-
-		byte[] memory = Machine.processor().getMemory();
-
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
+		// check offset and length first
+		if(offset >= 0 && length >= 0 && offset + length <= data.length){
+			System.out.println("invalid offset or/and length");
 			return 0;
+		}
+		// write data to
+		byte[] memory = Machine.processor().getMemory();
+		// check vaddr is valid
+		if (vaddr < 0 || vaddr > pageTable.length * pageSize) {
+			System.out.println("invalid vaddr");
+			return 0;
+		}
+		// initialize variables
+		int initialVPN = Processor.pageFromAddress(vaddr);	//this variable won't be updated
 
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(data, offset, memory, vaddr, amount);
-
-		return amount;
+		if (initialVPN >= pageTable.length) {
+			System.out.println("invalid initial vaddr, vpn out of bounds");
+			return 0;
+		}
+		TranslationEntry entry = pageTable[initialVPN];
+		int pageOffset = Processor.offsetFromAddress(vaddr);
+		int paddr = entry.ppn * pageSize + pageOffset;
+		int amount = 0;
+		int totalWrite = 0;
+		// before the loop nothing is copied, variables should be at initial value
+		// each iteration should read a new page
+		while (totalWrite < length) {
+			// check paddr
+			if (paddr < 0 || paddr >= memory.length) {
+				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
+			}
+			// check if the page is valid
+			if (!entry.valid) {
+				System.out.println("invalid page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
+			}
+			// update amount, only updated once
+			amount = Math.min(length - totalWrite, pageSize - pageOffset);
+			// actual copy
+			System.arraycopy(data, offset, memory, paddr, amount);
+			// update vaddr->entry->pageOffset->paddr
+			vaddr += amount;
+			int curVPN = Processor.pageFromAddress(vaddr);
+			if (curVPN >= pageTable.length) {
+				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				return totalWrite;
+			}
+			// for debug
+			TranslationEntry entryOld = entry;
+			entry = pageTable[Processor.pageFromAddress(vaddr)];
+			// debug
+			Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
+			pageOffset = Processor.offsetFromAddress(vaddr);
+			// debug
+			Lib.assertTrue(pageOffset == 0);
+			paddr = entry.ppn * pageSize + pageOffset;
+			// update cumulative variables
+			offset += amount;
+			totalWrite += amount;
+		}
+		return totalWrite;
 	}
 
 	/**
@@ -303,8 +417,12 @@ public class UserProcess {
 			Lib.debug(dbgProcess, "\tinsufficient physical memory");
 			return false;
 		}
-
+		// initialize page table
+		pageTable = new TranslationEntry[numPages];
+		// acquire the lock before loading
+		UserKernel.pagesAvailableMutex.acquire();
 		// load sections
+		int counter = 0;
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
 
@@ -313,12 +431,42 @@ public class UserProcess {
 
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
-
+				// get the first available ppn and assign to the page
+				boolean readOnly = section.isReadOnly();
+				// acquire the lock before loading
+				UserKernel.pagesAvailableMutex.acquire();
+				try {
+					int ppn = UserKernel.pagesAvailable.removeLast();
+					section.loadPage(i, ppn);
+					pageTable[counter] = new TranslationEntry(vpn, ppn, true, readOnly, false, false);
+				} catch (NoSuchElementException e){
+					System.out.println("No available physical page for process " + pid);
+					unloadSections();
+					UserKernel.pagesAvailableMutex.release();
+					return false;
+				}
+				UserKernel.pagesAvailableMutex.release();
 				// for now, just assume virtual addresses=physical addresses
-				section.loadPage(i, vpn);
+				counter++;
 			}
 		}
-
+		// debug
+		Lib.assertTrue(counter == numPages - 9);
+		// load stack pages and argument page, 9 pages in total
+		for (int i = counter; i < numPages; i++) {
+			// acquire the lock before loading
+			UserKernel.pagesAvailableMutex.acquire();
+			try {
+				int ppn = UserKernel.pagesAvailable.removeLast();
+				pageTable[counter] = new TranslationEntry(i, ppn, true, false, false, false);
+			} catch (NoSuchElementException e){
+				System.out.println("No available physical page for process" + pid);
+				unloadSections();
+				UserKernel.pagesAvailableMutex.release();
+				return false;
+			}
+			UserKernel.pagesAvailableMutex.release();
+		}
 		return true;
 	}
 
@@ -326,6 +474,17 @@ public class UserProcess {
 	 * Release any resources allocated by <tt>loadSections()</tt>.
 	 */
 	protected void unloadSections() {
+		for (int i = 0; i < pageTable.length; i++){
+			if (pageTable[i] == null || !pageTable[i].valid){
+				continue;
+			}
+			int ppn = pageTable[i].ppn;
+			// acquire mutex lock
+			UserKernel.pagesAvailableMutex.acquire();
+			UserKernel.pagesAvailable.add(ppn);
+			UserKernel.pagesAvailableMutex.release();
+			pageTable[i] = null;
+		}
 	}
 
 	/**
@@ -355,11 +514,14 @@ public class UserProcess {
 	 * Handle the halt() system call.
 	 */
 	private int handleHalt() {
+		if (pid == 0) {
 
-		Machine.halt();
+			Machine.halt();
 
-		Lib.assertNotReached("Machine.halt() did not halt machine!");
-		return 0;
+			Lib.assertNotReached("Machine.halt() did not halt machine!");
+			return 0;
+		}
+		return -1;
 	}
 
 	/**
@@ -371,10 +533,43 @@ public class UserProcess {
 		// ...and leave it as the top of handleExit so that we
 		// can grade your implementation.
 
+		// close all file descriptors
+		for (OpenFile openedFile : fileDescriptors) {
+			if (openedFile != null) {
+				openedFile.close();
+				openedFile = null; //need to clear descriptor?
+			}
+		}
+		// unload sections
+		unloadSections();
+		//close coff
+		coff.close();
+		// save exit status to childrenExitStatus
+		if (parent != null){
+			if(exception) {
+				parent.childrenExitStatus.put(this, null);
+			} else{
+				parent.childrenExitStatus.put(this, status);
+			}
+			// should wake join cv?
+			UserKernel.joinMutex.acquire();
+			parent.joinCV.wake();
+			UserKernel.joinMutex.release();
+		}
+		// set parent of this process's children to null
+		for (UserProcess child : children.values()) {
+			child.parent = null;
+		}
+		// check if this process is the last process
+		UserKernel.runningProcessCounterMutex.acquire();
+		if (--UserKernel.runningProcessCounter == 0) {
+			// terminate kernal
+			Kernel.kernel.terminate();
+		}
+		UserKernel.runningProcessCounterMutex.release();
+		KThread.finish();
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
-		Kernel.kernel.terminate();
-
 		return 0;
 	}
 
@@ -480,17 +675,17 @@ public class UserProcess {
 			System.out.println("handleRead: there is no file at given fileDescriptor.");
 			return -1;
 		}
-		byte[] buf = new byte[pageSize];
+		byte[] pageSizeArray = new byte[pageSize];
 		int readCount = 0;
 		while (count > pageSize) {
-			int oneTurnRead = openFile.read(buf,0,pageSize);
+			int oneTurnRead = openFile.read(pageSizeArray,0,pageSize);
 			if (oneTurnRead == 0 ) return readCount;
 			if (oneTurnRead < 0) {
 				System.out.println("handleRead: openFile read method failure.");
 				return -1;
 			}
 			// Write
-			int oneTurnWrite = writeVirtualMemory(buffer,buf,0,oneTurnRead);
+			int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
 			if (oneTurnRead!=oneTurnWrite) {
 				System.out.println("handleRead: write onto VM failure.");
 				return -1;
@@ -499,12 +694,12 @@ public class UserProcess {
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
 		}
-		int oneTurnRead = openFile.read(buf,0,count);
+		int oneTurnRead = openFile.read(pageSizeArray,0,count);
 		if (oneTurnRead < 0) {
 			System.out.println("handleRead: openFile read method failure.");
 			return -1;
 		}
-		int oneTurnWrite = writeVirtualMemory(buffer,buf,0,oneTurnRead);
+		int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
 		if (oneTurnRead!=oneTurnWrite) {
 			System.out.println("handleRead: write onto VM failure.");
 			return -1;
@@ -547,11 +742,11 @@ public class UserProcess {
 			System.out.println("handleWrite: there is no file at given fileDescriptor.");
 			return -1;
 		}
-		byte[] buf = new byte[pageSize];
+		byte[] pageSizeArray = new byte[pageSize];
 		int writeCount = 0;
 		while (count > pageSize) {
-			int oneTurnRead = readVirtualMemory(buffer,buf);
-			int oneTurnWrite = openFile.write(buf,0,oneTurnRead);
+			int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+			int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 			if (oneTurnWrite == 0 ) return writeCount;
 			if (oneTurnWrite < 0) {
 				System.out.println("handleWrite: openFile write method failure.");
@@ -565,8 +760,8 @@ public class UserProcess {
 			writeCount += oneTurnWrite;
 			count -= oneTurnWrite;
 		}
-		int oneTurnRead = readVirtualMemory(buffer,buf);
-		int oneTurnWrite = openFile.write(buf,0,oneTurnRead);
+		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
@@ -652,15 +847,84 @@ public class UserProcess {
 	 */
 	private int handleExec(int file, int argc, int argv) {
 
-		return 0;
+		//check inputs
+		if (argc < 0) {
+			System.out.println("Invalid input for handleExec, argc < 0");
+			return -1;
+		}
+		String filename = readVirtualMemoryString(file,256);
+		if (filename == null) {
+			System.out.println("Invalid filename for handleExec");
+			return -1;
+		}
+		if (filename.length() < 5) {
+			System.out.println("Invalid filename length, length["+filename.length()+"] < 5");
+		}
+		String extension = filename.substring(filename.length()-5, filename.length());
+		if (extension != ".coff") {
+			System.out.println("Invalid filename extension, extension["+extension+"] is not .coff");
+		}
+
+		// read arguments
+		String[] args = new String[argc];
+		byte[] argBuffer = new byte[4];
+		for (int i = 0; i < argc; i++) {
+			readVirtualMemory(argv + i * 4, argBuffer);
+			String cur_arg = readVirtualMemoryString(Lib.bytesToInt(argBuffer, 0),256);
+			// check for null argument
+			if (cur_arg == null){
+				System.out.println("invalid argument from memory, argument is null");
+				return -1;
+			}
+			args[i] = cur_arg;
+		}
+
+		// create child process
+		UserProcess child = new UserProcess();
+		// child is not exited so no exit status
+		children.put(child.pid, child);
+		child.parent = this;
+		// try execute the child
+		if (!child.execute(filename, args)) {
+			System.out.println("Child execution unsuccessful");
+			//childrenStatus.remove(child);
+			return -1;
+		}
+		// Increment of runningProcessCounter in execute
+		return child.pid;
 	}
 
 	/**
 	 * Handle the join() system call.
 	 */
 	private int handleJoin(int processID, int status) {
+		// check if the pid belongs to a child process(valid)
+		// out of address space?
+		if (!children.containsKey(processID)) {
+			System.out.println("handleJoin: Invalid pid [" + processID + "], either the pid doesn't belong to a child process or it has been joined");
+			return -1;
+		}
 
-		return 0;
+		UserProcess child = children.get(processID);
+
+		// check if the child is finished
+		if (!childrenExitStatus.containsKey(child)) {
+			UserKernel.joinMutex.acquire();
+			joinCV.sleep();
+			UserKernel.joinMutex.release();
+		}
+
+		// save the children's exit status if it has one
+		Integer exitStatus = childrenExitStatus.get(child);
+		if (exitStatus == null) {
+			// indicates an exit from unhandled exception
+			System.out.println("handleJoin: Child [" + processID + "] exited due to unhandled exception, returning 0.");
+			return 0;
+		}
+		byte[] buffer = Lib.bytesFromInt(exitStatus);
+		writeVirtualMemory(status, buffer);
+		System.out.println("handleJoin: Child [" + processID + "] exited with status[" + exitStatus + "], returning 1.");
+		return 1;
 	}
 
 	/****************************PART 3 END****************************/
@@ -790,6 +1054,9 @@ public class UserProcess {
 			Lib.debug(dbgProcess, "Unexpected exception: "
 					+ Processor.exceptionNames[cause]);
 			Lib.assertNotReached("Unexpected exception");
+			// trigger flag
+			exception = true;
+			handleExit(cause);
 		}
 	}
 
@@ -810,6 +1077,8 @@ public class UserProcess {
 
 	/** The array contains all fileDescriptor. */
 	protected OpenFile[] fileDescriptors;
+
+	private int pid;
     
 	private int initialPC, initialSP;
 
@@ -818,4 +1087,19 @@ public class UserProcess {
 	private static final int pageSize = Processor.pageSize;
 
 	private static final char dbgProcess = 'a';
+
+	/** Part 3 */
+	private HashMap<UserProcess, Integer> childrenExitStatus;
+
+	private HashMap<Integer, UserProcess> children;
+
+	private UserProcess parent;
+
+	private boolean exception = false;
+
+	// each process sleeps/wakes on it's own cv
+	private Condition joinCV;
+
+
+
 }
