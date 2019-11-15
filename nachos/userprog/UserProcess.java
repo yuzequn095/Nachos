@@ -5,6 +5,7 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
+import java.awt.print.Pageable;
 import java.io.EOFException;
 import java.util.NoSuchElementException;
 
@@ -152,19 +153,65 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
-		Lib.assertTrue(offset >= 0 && length >= 0
-				&& offset + length <= data.length);
-
-		byte[] memory = Machine.processor().getMemory();
-
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
+		// check offset and length
+		if(offset >= 0 && length >= 0 && offset + length <= data.length){
+			System.out.println("invalid offset or/and length");
 			return 0;
-
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(memory, vaddr, data, offset, amount);
-
-		return amount;
+		}
+		byte[] memory = Machine.processor().getMemory();
+		//check vaddr
+		if (vaddr < 0 || vaddr > pageTable.length * pageSize) {
+			System.out.println("invalid vaddr");
+			return 0;
+		}
+		// initialize variables
+		int initialVPN = Processor.pageFromAddress(vaddr);	//this variable won't be updated
+		if (initialVPN >= pageTable.length) {
+			System.out.println("invalid initial vaddr, vpn out of bounds");
+			return 0;
+		}
+		TranslationEntry entry = pageTable[initialVPN];
+		int pageOffset = Processor.offsetFromAddress(vaddr);
+		int paddr = entry.ppn * pageSize + pageOffset;
+		int amount = 0;
+		int totalRead = 0;
+		// before the loop nothing is copied, variables should be at initial value
+		// each iteration should read a new page
+		while (totalRead < length) {
+			// check paddr
+			if (paddr < 0 || paddr >= memory.length) {
+				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalRead;
+			}
+			// check if the page is valid
+			if (!entry.valid) {
+				System.out.println("invalid page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalRead;
+			}
+			// update amount, only updated once
+			amount = Math.min(length - totalRead, pageSize - pageOffset);
+			// actual copy
+			System.arraycopy(memory, paddr, data, offset, amount);
+			// update vaddr->entry->pageOffset->paddr
+			vaddr += amount;
+			int curVPN = Processor.pageFromAddress(vaddr);
+			if (curVPN >= pageTable.length) {
+				return totalRead;
+			}
+			// for debug
+			TranslationEntry entryOld = entry;
+			entry = pageTable[Processor.pageFromAddress(vaddr)];
+			// debug
+			Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
+			pageOffset = Processor.offsetFromAddress(vaddr);
+			// debug
+			Lib.assertTrue(pageOffset == 0);
+			paddr = entry.ppn * pageSize + pageOffset;
+			// update cumulative variables
+			offset += amount;
+			totalRead += amount;
+		}
+		return totalRead;
 	}
 
 	/**
@@ -531,17 +578,17 @@ public class UserProcess {
 			System.out.println("handleRead: there is no file at given fileDescriptor.");
 			return -1;
 		}
-		byte[] buf = new byte[pageSize];
+		byte[] pageSizeArray = new byte[pageSize];
 		int readCount = 0;
 		while (count > pageSize) {
-			int oneTurnRead = openFile.read(buf,0,pageSize);
+			int oneTurnRead = openFile.read(pageSizeArray,0,pageSize);
 			if (oneTurnRead == 0 ) return readCount;
 			if (oneTurnRead < 0) {
 				System.out.println("handleRead: openFile read method failure.");
 				return -1;
 			}
 			// Write
-			int oneTurnWrite = writeVirtualMemory(buffer,buf,0,oneTurnRead);
+			int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
 			if (oneTurnRead!=oneTurnWrite) {
 				System.out.println("handleRead: write onto VM failure.");
 				return -1;
@@ -550,12 +597,12 @@ public class UserProcess {
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
 		}
-		int oneTurnRead = openFile.read(buf,0,count);
+		int oneTurnRead = openFile.read(pageSizeArray,0,count);
 		if (oneTurnRead < 0) {
 			System.out.println("handleRead: openFile read method failure.");
 			return -1;
 		}
-		int oneTurnWrite = writeVirtualMemory(buffer,buf,0,oneTurnRead);
+		int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
 		if (oneTurnRead!=oneTurnWrite) {
 			System.out.println("handleRead: write onto VM failure.");
 			return -1;
@@ -598,11 +645,11 @@ public class UserProcess {
 			System.out.println("handleWrite: there is no file at given fileDescriptor.");
 			return -1;
 		}
-		byte[] buf = new byte[pageSize];
+		byte[] pageSizeArray = new byte[pageSize];
 		int writeCount = 0;
 		while (count > pageSize) {
-			int oneTurnRead = readVirtualMemory(buffer,buf);
-			int oneTurnWrite = openFile.write(buf,0,oneTurnRead);
+			int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+			int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 			if (oneTurnWrite == 0 ) return writeCount;
 			if (oneTurnWrite < 0) {
 				System.out.println("handleWrite: openFile write method failure.");
@@ -616,8 +663,8 @@ public class UserProcess {
 			writeCount += oneTurnWrite;
 			count -= oneTurnWrite;
 		}
-		int oneTurnRead = readVirtualMemory(buffer,buf);
-		int oneTurnWrite = openFile.write(buf,0,oneTurnRead);
+		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
