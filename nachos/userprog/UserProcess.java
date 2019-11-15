@@ -570,11 +570,6 @@ public class UserProcess {
 		KThread.finish();
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
-<<<<<<< HEAD
-		Kernel.kernel.terminate();z
-
-=======
->>>>>>> 2522b1b15364df7ab45b55ea5ab05693346734b4
 		return 0;
 	}
 
