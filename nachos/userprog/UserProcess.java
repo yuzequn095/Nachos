@@ -373,7 +373,7 @@ public class UserProcess {
 
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
-		Kernel.kernel.terminate();
+		Kernel.kernel.terminate();z
 
 		return 0;
 	}
