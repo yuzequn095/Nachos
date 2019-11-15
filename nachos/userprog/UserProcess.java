@@ -196,6 +196,7 @@ public class UserProcess {
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
+				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
 				return totalRead;
 			}
 			// for debug
@@ -241,19 +242,68 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 	public int writeVirtualMemory(int vaddr, byte[] data, int offset, int length) {
-		Lib.assertTrue(offset >= 0 && length >= 0
-				&& offset + length <= data.length);
-
-		byte[] memory = Machine.processor().getMemory();
-
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
+		// check offset and length first
+		if(offset >= 0 && length >= 0 && offset + length <= data.length){
+			System.out.println("invalid offset or/and length");
 			return 0;
+		}
+		// write data to
+		byte[] memory = Machine.processor().getMemory();
+		// check vaddr is valid
+		if (vaddr < 0 || vaddr > pageTable.length * pageSize) {
+			System.out.println("invalid vaddr");
+			return 0;
+		}
+		// initialize variables
+		int initialVPN = Processor.pageFromAddress(vaddr);	//this variable won't be updated
 
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(data, offset, memory, vaddr, amount);
-
-		return amount;
+		if (initialVPN >= pageTable.length) {
+			System.out.println("invalid initial vaddr, vpn out of bounds");
+			return 0;
+		}
+		TranslationEntry entry = pageTable[initialVPN];
+		int pageOffset = Processor.offsetFromAddress(vaddr);
+		int paddr = entry.ppn * pageSize + pageOffset;
+		int amount = 0;
+		int totalWrite = 0;
+		// before the loop nothing is copied, variables should be at initial value
+		// each iteration should read a new page
+		while (totalWrite < length) {
+			// check paddr
+			if (paddr < 0 || paddr >= memory.length) {
+				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
+			}
+			// check if the page is valid
+			if (!entry.valid) {
+				System.out.println("invalid page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
+			}
+			// update amount, only updated once
+			amount = Math.min(length - totalWrite, pageSize - pageOffset);
+			// actual copy
+			System.arraycopy(data, offset, memory, paddr, amount);
+			// update vaddr->entry->pageOffset->paddr
+			vaddr += amount;
+			int curVPN = Processor.pageFromAddress(vaddr);
+			if (curVPN >= pageTable.length) {
+				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				return totalWrite;
+			}
+			// for debug
+			TranslationEntry entryOld = entry;
+			entry = pageTable[Processor.pageFromAddress(vaddr)];
+			// debug
+			Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
+			pageOffset = Processor.offsetFromAddress(vaddr);
+			// debug
+			Lib.assertTrue(pageOffset == 0);
+			paddr = entry.ppn * pageSize + pageOffset;
+			// update cumulative variables
+			offset += amount;
+			totalWrite += amount;
+		}
+		return totalWrite;
 	}
 
 	/**
