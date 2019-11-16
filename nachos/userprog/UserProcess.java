@@ -440,7 +440,7 @@ public class UserProcess {
 		pageTable = new TranslationEntry[numPages];
 		UserKernel.pagesAvailableMutex.acquire();
 		for (int i = 0; i < numPages; i++) {
-			pageTable[i] = new TranslationEntry(i,UserKernel.pagesAvailable.removeLast(), true, false, false, false);
+			pageTable[i] = new TranslationEntry(i,UserKernel.pagesAvailable.remove(), true, false, false, false);
 		}
 		UserKernel.pagesAvailableMutex.release();
 		// acquire the lock before loading
@@ -742,7 +742,7 @@ public class UserProcess {
 		}
 		// Handle stuck in read only page case
 		oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
-		System.out.println("handleRead: read/write " + count + " bytes in total");
+		System.out.println("handleRead: read/write " + oneTurnRead + " bytes in this turn");
 		readCount += oneTurnRead;
 		count -= oneTurnRead;
 //		if (count!=0) {
