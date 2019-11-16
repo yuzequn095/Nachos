@@ -628,21 +628,24 @@ public class UserProcess {
 			System.out.println("handleCreat: No fileName found from Virtual Memory.");
 			return -1;
 		}
+		// check if we run out of fd
+		int entry = -1;
+		for (int i=2; i<fileDescriptors.length; i++) {
+			if (fileDescriptors[i] == null) {
+				entry = i;
+			}
+		}
+		if (entry < 0) {
+			System.out.println("handleCreat: fileDescriptors reaches the max capacity.");
+			return -1;
+		}
 		OpenFile openFile = Machine.stubFileSystem().open(fileName, true);
 		if (openFile==null) {
 			System.out.println("handleCreat: No file of fileName found from fileSystem.");
 			return -1;
-		} else {
-			for (int i=2; i<fileDescriptors.length; i++) {
-				if (fileDescriptors[i]==null) {
-					fileDescriptors[i] = openFile;
-					return i;
-				}
-			}
-			openFile.close();
-			System.out.println("handleCreat: fileDescriptors reaches the max capacity.");
-			return -1;
 		}
+		fileDescriptors[entry] = openFile;
+		return entry;
 	}
 
 	/**
