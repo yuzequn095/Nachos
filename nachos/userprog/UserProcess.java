@@ -971,7 +971,7 @@ public class UserProcess {
 			System.out.println("handleJoin: Invalid pid [" + processID + "], either the pid doesn't belong to a child process or it has been joined");
 			return -1;
 		}
-
+		System.out.println("handleJoin: Starting join child pid [" + processID + "]");
 		UserProcess child = children.get(processID);
 
 		// check if the child is finished
