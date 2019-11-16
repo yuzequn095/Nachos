@@ -632,7 +632,9 @@ public class UserProcess {
 		int entry = -1;
 		for (int i=2; i<fileDescriptors.length; i++) {
 			if (fileDescriptors[i] == null) {
+				System.out.println("handleCreat: file [" + fileName + "] assigned to fd [" + entry +"]");
 				entry = i;
+				break;
 			}
 		}
 		if (entry < 0) {
@@ -645,6 +647,7 @@ public class UserProcess {
 			return -1;
 		}
 		fileDescriptors[entry] = openFile;
+		System.out.println("handleCreat: file [" + fileName + "] successfully created at fd [" + entry +"]");
 		return entry;
 	}
 
