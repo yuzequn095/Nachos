@@ -1135,10 +1135,10 @@ public class UserProcess {
 		default:
 			Lib.debug(dbgProcess, "Unexpected exception: "
 					+ Processor.exceptionNames[cause]);
-			Lib.assertNotReached("Unexpected exception");
 			// trigger flag
 			exception = true;
 			handleExit(cause);
+			Lib.assertNotReached("Unexpected exception");
 		}
 	}
 
