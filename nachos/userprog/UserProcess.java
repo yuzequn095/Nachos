@@ -725,7 +725,7 @@ public class UserProcess {
 			}
 			// Handle stuck in read only page case
 			oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
-
+			System.out.println("handleRead: read/write " + count + " bytes in total, read/write " + oneTurnRead + " byte in this turn");
 			buffer += oneTurnRead;
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
@@ -742,7 +742,7 @@ public class UserProcess {
 		}
 		// Handle stuck in read only page case
 		oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
-
+		System.out.println("handleRead: read/write " + count + " bytes in total");
 		readCount += oneTurnRead;
 		count -= oneTurnRead;
 //		if (count!=0) {
