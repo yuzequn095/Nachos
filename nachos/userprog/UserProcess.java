@@ -725,7 +725,7 @@ public class UserProcess {
 			}
 			// Handle stuck in read only page case
 			oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
-			
+
 			buffer += oneTurnRead;
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
@@ -736,10 +736,13 @@ public class UserProcess {
 			return -1;
 		}
 		int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
-		if (oneTurnRead!=oneTurnWrite) {
+		if (oneTurnRead < oneTurnWrite) {
 			System.out.println("handleRead: write onto VM failure.");
 			return -1;
 		}
+		// Handle stuck in read only page case
+		oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
+
 		readCount += oneTurnRead;
 		count -= oneTurnRead;
 		if (count!=0) {
