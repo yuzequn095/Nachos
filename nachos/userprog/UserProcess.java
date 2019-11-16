@@ -745,10 +745,10 @@ public class UserProcess {
 
 		readCount += oneTurnRead;
 		count -= oneTurnRead;
-		if (count!=0) {
-			System.out.println("handleRead: not finish reading all.");
-			return -1;
-		}
+//		if (count!=0) {
+//			System.out.println("handleRead: not finish reading all.");
+//			return -1;
+//		}
 		return readCount;
 	}
 
