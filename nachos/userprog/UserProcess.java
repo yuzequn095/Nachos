@@ -883,6 +883,9 @@ public class UserProcess {
 		}
 		int fileDescriptor = -1;
 		for (int i=2; i<fileDescriptors.length; i++) {
+			if (fileDescriptors[i] == null) {
+				continue;
+			}
 			if (fileDescriptors[i].getName()==fileName) {
 				fileDescriptor = i;
 			}
