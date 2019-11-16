@@ -709,6 +709,11 @@ public class UserProcess {
 			System.out.println("handleRead: there is no file at given fileDescriptor.");
 			return -1;
 		}
+		// check count
+		if (count < 0 || count > pageTable.length*pageSize) {
+			System.out.println("handleRead: Initial count out of bound, either < 0 or > maximum space.");
+			return -1;
+		}
 		byte[] pageSizeArray = new byte[pageSize];
 		int readCount = 0;
 		while (count > pageSize) {
@@ -1003,7 +1008,11 @@ public class UserProcess {
 		}	
 
 		byte[] buffer = Lib.bytesFromInt(exitStatus);
-		writeVirtualMemory(status, buffer);
+		if (writeVirtualMemory(status, buffer) != 4) {
+			System.out.println("handleJoin: Child [" + processID + "] exit status is not size of int");
+			return -1;
+		}
+
 		System.out.println("handleJoin: Child [" + processID + "] exited with status[" + exitStatus + "], returning 1.");
 		return 1;
 	}
