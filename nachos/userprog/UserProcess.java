@@ -325,6 +325,7 @@ public class UserProcess {
 			offset += amount;
 			totalWrite += amount;
 		}
+		System.out.println("writeVirtualMemory: total written to VM: [" + totalWrite + "], exit now.");
 		return totalWrite;
 	}
 
@@ -632,8 +633,8 @@ public class UserProcess {
 		int entry = -1;
 		for (int i=2; i<fileDescriptors.length; i++) {
 			if (fileDescriptors[i] == null) {
-				System.out.println("handleCreat: file [" + fileName + "] assigned to fd [" + entry +"]");
 				entry = i;
+				System.out.println("handleCreat: file [" + fileName + "] assigned to fd [" + entry +"]");
 				break;
 			}
 		}
@@ -745,6 +746,7 @@ public class UserProcess {
 		}
 		UserKernel.rwMutex.acquire();
 		int oneTurnRead = openFile.read(pageSizeArray,0,count);
+		System.out.println("handleRead: read/write " + oneTurnRead + " bytes before write to VM this turn");
 		UserKernel.rwMutex.release();
 		if (oneTurnRead < 0) {
 			System.out.println("handleRead: openFile read method failure.");
