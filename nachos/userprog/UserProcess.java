@@ -585,10 +585,10 @@ public class UserProcess {
 			} else{
 				parent.childrenExitStatus.put(this, status);
 			}
-			// should wake join cv?
-			UserKernel.joinMutex.acquire();
-			parent.joinCV.wake();
-			UserKernel.joinMutex.release();
+//			// should wake join cv?
+//			UserKernel.joinMutex.acquire();
+//			parent.joinCV.wake();
+//			UserKernel.joinMutex.release();
 		}
 		// set parent of this process's children to null
 		for (UserProcess child : children.values()) {
@@ -877,7 +877,7 @@ public class UserProcess {
 	 */
 	private int handleUnlink(int name) {
 		String fileName = readVirtualMemoryString(name, 256);
-		if (fileName==null) {
+		if (fileName==null || fileName.length() <= 0) {
 			System.out.println("handleUnlink: No fileName found from Virtual Memory.");
 			return -1;
 		}
@@ -975,13 +975,19 @@ public class UserProcess {
 		UserProcess child = children.get(processID);
 
 		// check if the child is finished
-		if (!childrenExitStatus.containsKey(child)) {
-			UserKernel.joinMutex.acquire();
-			joinCV.sleep();
-			UserKernel.joinMutex.release();
-		} else {
-			System.out.println("handleJoin:  Child [" + processID + "] already exited with status[" +childrenExitStatus.get(child) + "] before calling join");
+//		if (!childrenExitStatus.containsKey(child)) {
+//			UserKernel.joinMutex.acquire();
+//			joinCV.sleep();
+//			UserKernel.joinMutex.release();
+//		} else {
+//			System.out.println("handleJoin:  Child [" + processID + "] already exited with status[" +childrenExitStatus.get(child) + "] before calling join");
+//		}
+		// call join use the child process's thread
+		if (child.thread == null) {
+			System.out.println("handleJoin: Child [" + processID + "]'s thread is null, aborting");
+			return -1;
 		}
+		child.thread.join();
 
 		// save the children's exit status if it has one
 		Integer exitStatus = childrenExitStatus.get(child);
