@@ -621,9 +621,10 @@ public class UserProcess {
 	 *
 	 * Returns the new file descriptor, or -1 if an error occurred.
 	 */
+	// FIXME case where run out of file descriptors. Also if the file is already in fd.
 	private int handleCreat(int name) {
 		String fileName = readVirtualMemoryString(name, 256);
-		if (fileName==null) {
+		if (fileName==null || fileName.length() == 0) {
 			System.out.println("handleCreat: No fileName found from Virtual Memory.");
 			return -1;
 		}
@@ -931,6 +932,7 @@ public class UserProcess {
 		}
 		if (filename.length() < 5) {
 			System.out.println("Invalid filename length, length["+filename.length()+"] < 5");
+			return -1;
 		}
 		String extension = filename.substring(filename.length()-5, filename.length());
 		//if (extension != ".coff") {
