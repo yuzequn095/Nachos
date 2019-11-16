@@ -206,9 +206,11 @@ public class UserProcess {
 			System.arraycopy(memory, paddr, data, offset, amount);
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
+			//TranslationEntry entryOld = entry;
+			//entry = pageTable[Processor.pageFromAddress(vaddr)];
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
-				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length + "length: " + length + "total read: " + totalRead);
 				return totalRead;
 			}
 			// for debug
@@ -298,9 +300,11 @@ public class UserProcess {
 			System.arraycopy(data, offset, memory, paddr, amount);
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
+			//TranslationEntry entryOld = entry;
+			//entry = pageTable[Processor.pageFromAddress(vaddr)];
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
-				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length);
 				return totalWrite;
 			}
 			// for debug
@@ -757,6 +761,7 @@ public class UserProcess {
 	 * if a network stream has already been terminated by the remote host.
 	 */
 	private int handleWrite(int fileDescriptor, int buffer, int count) {
+		// System.out.println("count: "+count);
 		if (fileDescriptor<0 || fileDescriptor>15) {
 			System.out.println("handleWrite: fileDescriptor is invalid.");
 			return -1;
@@ -770,8 +775,17 @@ public class UserProcess {
 		int writeCount = 0;
 		while (count > pageSize) {
 			int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+			// System.out.println("One turn read: " + oneTurnRead);
 			int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
-			if (oneTurnWrite == 0 ) return writeCount;
+			// should check this case first to make sure we read enough 
+			if(oneTurnRead != pageSize){
+				System.out.println("NO enough space.");
+				return -1;
+			}
+			if (oneTurnWrite == 0 ) {
+				System.out.println("We are here.");
+				return writeCount;
+			}
 			if (oneTurnWrite < 0) {
 				System.out.println("handleWrite: openFile write method failure.");
 				return -1;
@@ -790,23 +804,30 @@ public class UserProcess {
 		}
 		pageSizeArray = new byte[count];
 		//System.out.println("Start reading rest things buffer: "+buffer+" pageSize: " + pageSizeArray.length);
+		//System.out.println(buffer);
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
 		}
+		// System.out.println("read: " + oneTurnRead+ " write: "+ oneTurnWrite);
 		if (oneTurnRead!=oneTurnWrite) {
 			System.out.println("handleWrite: not match read from VM failure.");
 			return -1;
 		}
 		writeCount += oneTurnWrite;
 		count -= oneTurnWrite;
-		//System.out.println("writeCount: " + writeCount+ " count: " +count);
+		// System.out.println("writeCount: " + writeCount+ " count: " +count);
 		if (count!=0) {
 			System.out.println("handleWrite: not finish writing all.");
 			return -1;
 		}
+		if (writeCount>pageTable.length*pageSize) {
+			System.out.println("Out of address space.");
+			return -1;
+		}
+		// System.out.println(pageTable.length*pageSize);
 		return writeCount;
 	}
 
@@ -952,6 +973,12 @@ public class UserProcess {
 			System.out.println("handleJoin: Child [" + processID + "] exited due to unhandled exception, returning 0.");
 			return 0;
 		}
+
+		if( status > pageTable.length*pageSize ){
+			System.out.println("If the status is invalid, eg. beyong the end of the address space.");
+			return -1;
+		}	
+
 		byte[] buffer = Lib.bytesFromInt(exitStatus);
 		writeVirtualMemory(status, buffer);
 		System.out.println("handleJoin: Child [" + processID + "] exited with status[" + exitStatus + "], returning 1.");
