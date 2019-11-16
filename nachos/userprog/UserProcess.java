@@ -294,6 +294,11 @@ public class UserProcess {
 				System.out.println("invalid page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 				return totalWrite;
 			}
+			// check if the page is read_only
+			if (entry.readOnly) {
+				System.out.println("Read-Only page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
+			}
 			// update amount, only updated once
 			amount = Math.min(length - totalWrite, pageSize - pageOffset);
 			// actual copy
@@ -964,6 +969,8 @@ public class UserProcess {
 			UserKernel.joinMutex.acquire();
 			joinCV.sleep();
 			UserKernel.joinMutex.release();
+		} else {
+			System.out.println("handleJoin:  Child [" + processID + "] already exited with status[" +childrenExitStatus.get(child) + "] before calling join");
 		}
 
 		// save the children's exit status if it has one

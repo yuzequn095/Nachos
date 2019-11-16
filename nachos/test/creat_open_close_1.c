@@ -1,5 +1,6 @@
 #include "syscall.h"
 #include "stdio.h"
+#include "string.h"
 
 int main()
 {
@@ -26,7 +27,9 @@ int main()
 
     //input size > 256b
     char str[257];
-    memset(str, 'a', 257);
+    for (int i = 0; i < 257; i++) {
+        str[i] = 'a';
+    }
     str[256] = '\0';
 
     int fd5 = open( str );
