@@ -466,6 +466,7 @@ public class UserProcess {
 					int ppn = translationEntry.ppn;	
 					section.loadPage(i,ppn);
 					translationEntry.readOnly = readOnly;
+					System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 					//pageTable[counter] = new TranslationEntry(vpn, ppn, true, readOnly, false, false);
 				} catch (NoSuchElementException e){
 					System.out.println("No available physical page for process " + pid);
