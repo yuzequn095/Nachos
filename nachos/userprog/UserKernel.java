@@ -150,5 +150,5 @@ public class UserKernel extends ThreadedKernel {
 
 	protected static Lock runningProcessCounterMutex;
 
-	protected static Lock joinMutex;
+	protected static Lock rwMutex;
 }

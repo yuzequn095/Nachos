@@ -46,7 +46,7 @@ public class UserProcess {
 		childrenExitStatus = new HashMap<>();
 		children = new HashMap<>();
 		parent = null;
-		joinCV = new Condition(UserKernel.joinMutex);
+		// joinCV = new Condition(UserKernel.joinMutex);
 
 	}
 
@@ -743,7 +743,9 @@ public class UserProcess {
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
 		}
+		UserKernel.rwMutex.acquire();
 		int oneTurnRead = openFile.read(pageSizeArray,0,count);
+		UserKernel.rwMutex.release();
 		if (oneTurnRead < 0) {
 			System.out.println("handleRead: openFile read method failure.");
 			return -1;
@@ -830,7 +832,10 @@ public class UserProcess {
 		//System.out.println("Start reading rest things buffer: "+buffer+" pageSize: " + pageSizeArray.length);
 		//System.out.println(buffer);
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+		// lock
+		UserKernel.rwMutex.acquire();
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
+		UserKernel.rwMutex.release();
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
