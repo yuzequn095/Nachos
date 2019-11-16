@@ -30,6 +30,10 @@ public class UserKernel extends ThreadedKernel {
 				exceptionHandler();
 			}
 		});
+		pagesAvailableMutex = new Lock();
+		pidCounterMutex = new Lock();
+		runningProcessCounterMutex = new Lock();
+		joinMutex = new Lock();
 		pidCounter = 0;
 		runningProcessCounter = 0;
 	}
@@ -136,15 +140,15 @@ public class UserKernel extends ThreadedKernel {
 
 	protected static LinkedList<Integer> pagesAvailable = new LinkedList<>();
 
-	protected static Lock pagesAvailableMutex = new Lock();
+	protected static Lock pagesAvailableMutex;
 
 	protected static int pidCounter;
 
-	protected static Lock pidCounterMutex = new Lock();
+	protected static Lock pidCounterMutex;
 
 	protected static int runningProcessCounter;
 
-	protected static Lock runningProcessCounterMutex = new Lock();
+	protected static Lock runningProcessCounterMutex;
 
-	protected static Lock joinMutex = new Lock();
+	protected static Lock joinMutex;
 }

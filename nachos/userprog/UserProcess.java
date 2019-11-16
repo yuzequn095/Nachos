@@ -164,9 +164,10 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
+		Lib.debug(dbgProcess, "start rVM");
 		// check offset and length
-		if(offset >= 0 && length >= 0 && offset + length <= data.length){
-			System.out.println("invalid offset or/and length");
+		if(offset < 0 || length < 0 || offset + length > data.length){
+			System.out.println("invalid offset:" + offset+" or/and length: "+length+" data.length: " +data.length);
 			return 0;
 		}
 		byte[] memory = Machine.processor().getMemory();
@@ -214,10 +215,10 @@ public class UserProcess {
 			TranslationEntry entryOld = entry;
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
 			// debug
-			Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
+			//Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
 			pageOffset = Processor.offsetFromAddress(vaddr);
 			// debug
-			Lib.assertTrue(pageOffset == 0);
+			//Lib.assertTrue(pageOffset == 0);
 			paddr = entry.ppn * pageSize + pageOffset;
 			// update cumulative variables
 			offset += amount;
@@ -253,8 +254,9 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 	public int writeVirtualMemory(int vaddr, byte[] data, int offset, int length) {
+		Lib.debug(dbgProcess,"start wVM");
 		// check offset and length first
-		if(offset >= 0 && length >= 0 && offset + length <= data.length){
+		if(offset < 0 || length < 0 || offset + length > data.length){
 			System.out.println("invalid offset or/and length");
 			return 0;
 		}
@@ -305,10 +307,10 @@ public class UserProcess {
 			TranslationEntry entryOld = entry;
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
 			// debug
-			Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
+			// Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
 			pageOffset = Processor.offsetFromAddress(vaddr);
 			// debug
-			Lib.assertTrue(pageOffset == 0);
+			// Lib.assertTrue(pageOffset == 0);
 			paddr = entry.ppn * pageSize + pageOffset;
 			// update cumulative variables
 			offset += amount;
@@ -384,6 +386,7 @@ public class UserProcess {
 		if (!loadSections())
 			return false;
 
+		Lib.debug(dbgProcess, "loadsection not false");
 		// store arguments in last page
 		int entryOffset = (numPages - 1) * pageSize;
 		int stringOffset = entryOffset + args.length * 4;
@@ -393,14 +396,20 @@ public class UserProcess {
 
 		for (int i = 0; i < argv.length; i++) {
 			byte[] stringOffsetBytes = Lib.bytesFromInt(stringOffset);
+			//TODO
+			Lib.debug(dbgProcess, "1");
 			Lib.assertTrue(writeVirtualMemory(entryOffset, stringOffsetBytes) == 4);
 			entryOffset += 4;
+			Lib.debug(dbgProcess, "2");
 			Lib.assertTrue(writeVirtualMemory(stringOffset, argv[i]) == argv[i].length);
 			stringOffset += argv[i].length;
+			Lib.debug(dbgProcess, "3");
 			Lib.assertTrue(writeVirtualMemory(stringOffset, new byte[] { 0 }) == 1);
+			Lib.debug(dbgProcess, "4");
 			stringOffset += 1;
 		}
-
+		
+		Lib.debug(dbgProcess, "load not false");
 		return true;
 	}
 
@@ -412,15 +421,21 @@ public class UserProcess {
 	 * @return <tt>true</tt> if the sections were successfully loaded.
 	 */
 	protected boolean loadSections() {
-		if (numPages > Machine.processor().getNumPhysPages()) {
+		Lib.debug(dbgProcess, "load section starts");
+		if (numPages > Machine.processor().getNumPhysPages() || numPages>UserKernel.pagesAvailable.size()) {
 			coff.close();
 			Lib.debug(dbgProcess, "\tinsufficient physical memory");
 			return false;
 		}
 		// initialize page table
 		pageTable = new TranslationEntry[numPages];
-		// acquire the lock before loading
 		UserKernel.pagesAvailableMutex.acquire();
+		for (int i = 0; i < numPages; i++) {
+			pageTable[i] = new TranslationEntry(i,UserKernel.pagesAvailable.removeLast(), true, false, false, false);
+		}
+		UserKernel.pagesAvailableMutex.release();
+		// acquire the lock before loading
+		//UserKernel.pagesAvailableMutex.acquire();
 		// load sections
 		int counter = 0;
 		for (int s = 0; s < coff.getNumSections(); s++) {
@@ -436,9 +451,13 @@ public class UserProcess {
 				// acquire the lock before loading
 				UserKernel.pagesAvailableMutex.acquire();
 				try {
-					int ppn = UserKernel.pagesAvailable.removeLast();
-					section.loadPage(i, ppn);
-					pageTable[counter] = new TranslationEntry(vpn, ppn, true, readOnly, false, false);
+					//int ppn = UserKernel.pagesAvailable.removeLast();
+					//section.loadPage(i, ppn);
+					TranslationEntry translationEntry = pageTable[vpn];
+					int ppn = translationEntry.ppn;	
+					section.loadPage(i,ppn);
+					translationEntry.readOnly = readOnly;
+					//pageTable[counter] = new TranslationEntry(vpn, ppn, true, readOnly, false, false);
 				} catch (NoSuchElementException e){
 					System.out.println("No available physical page for process " + pid);
 					unloadSections();
@@ -451,6 +470,8 @@ public class UserProcess {
 			}
 		}
 		// debug
+		/**
+		Lib.debug(dbgProcess, "numPages: " + numPages + " counter: " + counter);
 		Lib.assertTrue(counter == numPages - 9);
 		// load stack pages and argument page, 9 pages in total
 		for (int i = counter; i < numPages; i++) {
@@ -465,8 +486,10 @@ public class UserProcess {
 				UserKernel.pagesAvailableMutex.release();
 				return false;
 			}
+			Lib.debug(dbgProcess, "finish load section");
 			UserKernel.pagesAvailableMutex.release();
 		}
+		*/
 		return true;
 	}
 
@@ -514,6 +537,7 @@ public class UserProcess {
 	 * Handle the halt() system call.
 	 */
 	private int handleHalt() {
+		Lib.debug(dbgProcess, "handling halt");
 		if (pid == 0) {
 
 			Machine.halt();
@@ -666,7 +690,7 @@ public class UserProcess {
 	 * no more data is available.
 	 */
 	private int handleRead(int fileDescriptor, int buffer, int count) {
-		if (fileDescriptor<=1 || fileDescriptor>15) {
+		if (fileDescriptor<0 || fileDescriptor>15) {
 			System.out.println("handleRead: fileDescriptor is invalid.");
 			return -1;
 		}
@@ -733,7 +757,7 @@ public class UserProcess {
 	 * if a network stream has already been terminated by the remote host.
 	 */
 	private int handleWrite(int fileDescriptor, int buffer, int count) {
-		if (fileDescriptor<=1 || fileDescriptor>15) {
+		if (fileDescriptor<0 || fileDescriptor>15) {
 			System.out.println("handleWrite: fileDescriptor is invalid.");
 			return -1;
 		}
@@ -760,6 +784,12 @@ public class UserProcess {
 			writeCount += oneTurnWrite;
 			count -= oneTurnWrite;
 		}
+		if (count<0) {
+			System.out.println("handleWrite: invalid count.");
+			return -1;
+		}
+		pageSizeArray = new byte[count];
+		//System.out.println("Start reading rest things buffer: "+buffer+" pageSize: " + pageSizeArray.length);
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 		if (oneTurnWrite < 0) {
@@ -772,6 +802,7 @@ public class UserProcess {
 		}
 		writeCount += oneTurnWrite;
 		count -= oneTurnWrite;
+		//System.out.println("writeCount: " + writeCount+ " count: " +count);
 		if (count!=0) {
 			System.out.println("handleWrite: not finish writing all.");
 			return -1;
@@ -861,9 +892,9 @@ public class UserProcess {
 			System.out.println("Invalid filename length, length["+filename.length()+"] < 5");
 		}
 		String extension = filename.substring(filename.length()-5, filename.length());
-		if (extension != ".coff") {
-			System.out.println("Invalid filename extension, extension["+extension+"] is not .coff");
-		}
+		//if (extension != ".coff") {
+		//	System.out.println("Invalid filename extension, extension["+extension+"] is not .coff");
+		//}
 
 		// read arguments
 		String[] args = new String[argc];
@@ -996,6 +1027,7 @@ public class UserProcess {
 	 * @return the value to be returned to the user.
 	 */
 	public int handleSyscall(int syscall, int a0, int a1, int a2, int a3) {
+		Lib.debug(dbgProcess, "handling syscall");
 		switch (syscall) {
 		case syscallHalt:
 			return handleHalt();
