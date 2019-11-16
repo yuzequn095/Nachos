@@ -51,11 +51,12 @@ do_close (int fd) {
 
 int test_creat_open(char *fname) {
     do_creat(fname);
-    fd = do_open(fname);
+    int fd = do_open(fname);
     do_close(fd);
 }
 
 int main () {
+    char *fname;
     fname = "creat.out";
     test_creat_open(fname);
 }
