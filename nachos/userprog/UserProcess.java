@@ -46,7 +46,6 @@ public class UserProcess {
 		childrenExitStatus = new HashMap<>();
 		children = new HashMap<>();
 		parent = null;
-		// joinCV = new Condition(UserKernel.joinMutex);
 
 	}
 
@@ -744,10 +743,10 @@ public class UserProcess {
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
 		}
-		UserKernel.rwMutex.acquire();
+//		UserKernel.rwMutex.acquire();
 		int oneTurnRead = openFile.read(pageSizeArray,0,count);
 		System.out.println("handleRead: read/write " + oneTurnRead + " bytes before write to VM this turn");
-		UserKernel.rwMutex.release();
+//		UserKernel.rwMutex.release();
 		if (oneTurnRead < 0) {
 			System.out.println("handleRead: openFile read method failure.");
 			return -1;
@@ -835,9 +834,9 @@ public class UserProcess {
 		//System.out.println(buffer);
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
 		// lock
-		UserKernel.rwMutex.acquire();
+//		UserKernel.rwMutex.acquire();
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
-		UserKernel.rwMutex.release();
+//		UserKernel.rwMutex.release();
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
@@ -1202,10 +1201,5 @@ public class UserProcess {
 	private UserProcess parent;
 
 	private boolean exception = false;
-
-	// each process sleeps/wakes on it's own cv
-	private Condition joinCV;
-
-
 
 }
