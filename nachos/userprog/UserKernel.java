@@ -33,7 +33,7 @@ public class UserKernel extends ThreadedKernel {
 		pagesAvailableMutex = new Lock();
 		pidCounterMutex = new Lock();
 		runningProcessCounterMutex = new Lock();
-		joinMutex = new Lock();
+		rwMutex = new Lock();
 		pidCounter = 0;
 		runningProcessCounter = 0;
 	}
@@ -150,5 +150,5 @@ public class UserKernel extends ThreadedKernel {
 
 	protected static Lock runningProcessCounterMutex;
 
-	protected static Lock joinMutex;
+	protected static Lock rwMutex;
 }

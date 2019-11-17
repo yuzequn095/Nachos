@@ -46,7 +46,7 @@ public class UserProcess {
 		childrenExitStatus = new HashMap<>();
 		children = new HashMap<>();
 		parent = null;
-		joinCV = new Condition(UserKernel.joinMutex);
+		// joinCV = new Condition(UserKernel.joinMutex);
 
 	}
 
@@ -206,9 +206,11 @@ public class UserProcess {
 			System.arraycopy(memory, paddr, data, offset, amount);
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
+			//TranslationEntry entryOld = entry;
+			//entry = pageTable[Processor.pageFromAddress(vaddr)];
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
-				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length + "length: " + length + "total read: " + totalRead);
 				return totalRead;
 			}
 			// for debug
@@ -292,15 +294,22 @@ public class UserProcess {
 				System.out.println("invalid page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 				return totalWrite;
 			}
+			// check if the page is read_only
+			if (entry.readOnly) {
+				System.out.println("Read-Only page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
+			}
 			// update amount, only updated once
 			amount = Math.min(length - totalWrite, pageSize - pageOffset);
 			// actual copy
 			System.arraycopy(data, offset, memory, paddr, amount);
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
+			//TranslationEntry entryOld = entry;
+			//entry = pageTable[Processor.pageFromAddress(vaddr)];
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
-				System.out.println("invalid vpn out of bounds, vpn: " + entry.vpn + "maximum: " + pageTable.length);
+				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length);
 				return totalWrite;
 			}
 			// for debug
@@ -316,6 +325,7 @@ public class UserProcess {
 			offset += amount;
 			totalWrite += amount;
 		}
+		System.out.println("writeVirtualMemory: total written to VM: [" + totalWrite + "], exit now.");
 		return totalWrite;
 	}
 
@@ -431,7 +441,7 @@ public class UserProcess {
 		pageTable = new TranslationEntry[numPages];
 		UserKernel.pagesAvailableMutex.acquire();
 		for (int i = 0; i < numPages; i++) {
-			pageTable[i] = new TranslationEntry(i,UserKernel.pagesAvailable.removeLast(), true, false, false, false);
+			pageTable[i] = new TranslationEntry(i,UserKernel.pagesAvailable.remove(), true, false, false, false);
 		}
 		UserKernel.pagesAvailableMutex.release();
 		// acquire the lock before loading
@@ -457,6 +467,7 @@ public class UserProcess {
 					int ppn = translationEntry.ppn;	
 					section.loadPage(i,ppn);
 					translationEntry.readOnly = readOnly;
+					System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 					//pageTable[counter] = new TranslationEntry(vpn, ppn, true, readOnly, false, false);
 				} catch (NoSuchElementException e){
 					System.out.println("No available physical page for process " + pid);
@@ -575,10 +586,10 @@ public class UserProcess {
 			} else{
 				parent.childrenExitStatus.put(this, status);
 			}
-			// should wake join cv?
-			UserKernel.joinMutex.acquire();
-			parent.joinCV.wake();
-			UserKernel.joinMutex.release();
+//			// should wake join cv?
+//			UserKernel.joinMutex.acquire();
+//			parent.joinCV.wake();
+//			UserKernel.joinMutex.release();
 		}
 		// set parent of this process's children to null
 		for (UserProcess child : children.values()) {
@@ -611,27 +622,34 @@ public class UserProcess {
 	 *
 	 * Returns the new file descriptor, or -1 if an error occurred.
 	 */
+	// FIXME case where run out of file descriptors. Also if the file is already in fd.
 	private int handleCreat(int name) {
 		String fileName = readVirtualMemoryString(name, 256);
-		if (fileName==null) {
+		if (fileName==null || fileName.length() == 0) {
 			System.out.println("handleCreat: No fileName found from Virtual Memory.");
+			return -1;
+		}
+		// check if we run out of fd
+		int entry = -1;
+		for (int i=2; i<fileDescriptors.length; i++) {
+			if (fileDescriptors[i] == null) {
+				entry = i;
+				System.out.println("handleCreat: file [" + fileName + "] assigned to fd [" + entry +"]");
+				break;
+			}
+		}
+		if (entry < 0) {
+			System.out.println("handleCreat: fileDescriptors reaches the max capacity.");
 			return -1;
 		}
 		OpenFile openFile = Machine.stubFileSystem().open(fileName, true);
 		if (openFile==null) {
 			System.out.println("handleCreat: No file of fileName found from fileSystem.");
 			return -1;
-		} else {
-			for (int i=2; i<fileDescriptors.length; i++) {
-				if (fileDescriptors[i]==null) {
-					fileDescriptors[i] = openFile;
-					return i;
-				}
-			}
-			openFile.close();
-			System.out.println("handleCreat: fileDescriptors reaches the max capacity.");
-			return -1;
 		}
+		fileDescriptors[entry] = openFile;
+		System.out.println("handleCreat: file [" + fileName + "] successfully created at fd [" + entry +"]");
+		return entry;
 	}
 
 	/**
@@ -699,6 +717,11 @@ public class UserProcess {
 			System.out.println("handleRead: there is no file at given fileDescriptor.");
 			return -1;
 		}
+		// check count
+		if (count < 0 || count > pageTable.length*pageSize) {
+			System.out.println("handleRead: Initial count out of bound, either < 0 or > maximum space.");
+			return -1;
+		}
 		byte[] pageSizeArray = new byte[pageSize];
 		int readCount = 0;
 		while (count > pageSize) {
@@ -710,30 +733,39 @@ public class UserProcess {
 			}
 			// Write
 			int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
-			if (oneTurnRead!=oneTurnWrite) {
+			if (oneTurnRead < oneTurnWrite) {
 				System.out.println("handleRead: write onto VM failure.");
 				return -1;
 			}
+			// Handle stuck in read only page case
+			oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
+			System.out.println("handleRead: read/write " + count + " bytes in total, read/write " + oneTurnRead + " byte in this turn");
 			buffer += oneTurnRead;
 			readCount += oneTurnRead;
 			count -= oneTurnRead;
 		}
+		UserKernel.rwMutex.acquire();
 		int oneTurnRead = openFile.read(pageSizeArray,0,count);
+		System.out.println("handleRead: read/write " + oneTurnRead + " bytes before write to VM this turn");
+		UserKernel.rwMutex.release();
 		if (oneTurnRead < 0) {
 			System.out.println("handleRead: openFile read method failure.");
 			return -1;
 		}
 		int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
-		if (oneTurnRead!=oneTurnWrite) {
+		if (oneTurnRead < oneTurnWrite) {
 			System.out.println("handleRead: write onto VM failure.");
 			return -1;
 		}
+		// Handle stuck in read only page case
+		oneTurnRead = Math.min(oneTurnRead, oneTurnWrite);
+		System.out.println("handleRead: read/write " + oneTurnRead + " bytes in this turn");
 		readCount += oneTurnRead;
 		count -= oneTurnRead;
-		if (count!=0) {
-			System.out.println("handleRead: not finish reading all.");
-			return -1;
-		}
+//		if (count!=0) {
+//			System.out.println("handleRead: not finish reading all.");
+//			return -1;
+//		}
 		return readCount;
 	}
 
@@ -757,6 +789,7 @@ public class UserProcess {
 	 * if a network stream has already been terminated by the remote host.
 	 */
 	private int handleWrite(int fileDescriptor, int buffer, int count) {
+		// System.out.println("count: "+count);
 		if (fileDescriptor<0 || fileDescriptor>15) {
 			System.out.println("handleWrite: fileDescriptor is invalid.");
 			return -1;
@@ -770,8 +803,17 @@ public class UserProcess {
 		int writeCount = 0;
 		while (count > pageSize) {
 			int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+			// System.out.println("One turn read: " + oneTurnRead);
 			int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
-			if (oneTurnWrite == 0 ) return writeCount;
+			// should check this case first to make sure we read enough 
+			if(oneTurnRead != pageSize){
+				System.out.println("NO enough space.");
+				return -1;
+			}
+			if (oneTurnWrite == 0 ) {
+				System.out.println("We are here.");
+				return writeCount;
+			}
 			if (oneTurnWrite < 0) {
 				System.out.println("handleWrite: openFile write method failure.");
 				return -1;
@@ -790,23 +832,33 @@ public class UserProcess {
 		}
 		pageSizeArray = new byte[count];
 		//System.out.println("Start reading rest things buffer: "+buffer+" pageSize: " + pageSizeArray.length);
+		//System.out.println(buffer);
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+		// lock
+		UserKernel.rwMutex.acquire();
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
+		UserKernel.rwMutex.release();
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
 		}
+		// System.out.println("read: " + oneTurnRead+ " write: "+ oneTurnWrite);
 		if (oneTurnRead!=oneTurnWrite) {
 			System.out.println("handleWrite: not match read from VM failure.");
 			return -1;
 		}
 		writeCount += oneTurnWrite;
 		count -= oneTurnWrite;
-		//System.out.println("writeCount: " + writeCount+ " count: " +count);
+		// System.out.println("writeCount: " + writeCount+ " count: " +count);
 		if (count!=0) {
 			System.out.println("handleWrite: not finish writing all.");
 			return -1;
 		}
+		if (writeCount>pageTable.length*pageSize) {
+			System.out.println("Out of address space.");
+			return -1;
+		}
+		// System.out.println(pageTable.length*pageSize);
 		return writeCount;
 	}
 
@@ -844,13 +896,16 @@ public class UserProcess {
 	 */
 	private int handleUnlink(int name) {
 		String fileName = readVirtualMemoryString(name, 256);
-		if (fileName==null) {
+		if (fileName==null || fileName.length() <= 0) {
 			System.out.println("handleUnlink: No fileName found from Virtual Memory.");
 			return -1;
 		}
 		int fileDescriptor = -1;
 		for (int i=2; i<fileDescriptors.length; i++) {
-			if (fileDescriptors[i].getName()==fileName) {
+			if (fileDescriptors[i] == null) {
+				continue;
+			}
+			if (fileDescriptors[i].getName().equals(fileName)) {
 				fileDescriptor = i;
 			}
 		}
@@ -890,6 +945,7 @@ public class UserProcess {
 		}
 		if (filename.length() < 5) {
 			System.out.println("Invalid filename length, length["+filename.length()+"] < 5");
+			return -1;
 		}
 		String extension = filename.substring(filename.length()-5, filename.length());
 		//if (extension != ".coff") {
@@ -935,15 +991,23 @@ public class UserProcess {
 			System.out.println("handleJoin: Invalid pid [" + processID + "], either the pid doesn't belong to a child process or it has been joined");
 			return -1;
 		}
-
+		System.out.println("handleJoin: Starting join child pid [" + processID + "]");
 		UserProcess child = children.get(processID);
 
 		// check if the child is finished
-		if (!childrenExitStatus.containsKey(child)) {
-			UserKernel.joinMutex.acquire();
-			joinCV.sleep();
-			UserKernel.joinMutex.release();
+//		if (!childrenExitStatus.containsKey(child)) {
+//			UserKernel.joinMutex.acquire();
+//			joinCV.sleep();
+//			UserKernel.joinMutex.release();
+//		} else {
+//			System.out.println("handleJoin:  Child [" + processID + "] already exited with status[" +childrenExitStatus.get(child) + "] before calling join");
+//		}
+		// call join use the child process's thread
+		if (child.thread == null) {
+			System.out.println("handleJoin: Child [" + processID + "]'s thread is null, aborting");
+			return -1;
 		}
+		child.thread.join();
 
 		// save the children's exit status if it has one
 		Integer exitStatus = childrenExitStatus.get(child);
@@ -952,8 +1016,18 @@ public class UserProcess {
 			System.out.println("handleJoin: Child [" + processID + "] exited due to unhandled exception, returning 0.");
 			return 0;
 		}
+
+		if( status > pageTable.length*pageSize ){
+			System.out.println("If the status is invalid, eg. beyong the end of the address space.");
+			return -1;
+		}	
+
 		byte[] buffer = Lib.bytesFromInt(exitStatus);
-		writeVirtualMemory(status, buffer);
+		if (writeVirtualMemory(status, buffer) != 4) {
+			System.out.println("handleJoin: Child [" + processID + "] exit status is not size of int");
+			return -1;
+		}
+
 		System.out.println("handleJoin: Child [" + processID + "] exited with status[" + exitStatus + "], returning 1.");
 		return 1;
 	}
@@ -1085,10 +1159,10 @@ public class UserProcess {
 		default:
 			Lib.debug(dbgProcess, "Unexpected exception: "
 					+ Processor.exceptionNames[cause]);
-			Lib.assertNotReached("Unexpected exception");
 			// trigger flag
 			exception = true;
 			handleExit(cause);
+			Lib.assertNotReached("Unexpected exception");
 		}
 	}
 
