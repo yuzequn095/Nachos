@@ -566,7 +566,7 @@ public class UserProcess {
 		Machine.autoGrader().finishingCurrentProcess(status);
 		// ...and leave it as the top of handleExit so that we
 		// can grade your implementation.
-
+		System.out.println("UserProcess.handleExit (" + status + ")");
 		// close all file descriptors
 		for (OpenFile openedFile : fileDescriptors) {
 			if (openedFile != null) {
