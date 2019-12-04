@@ -79,7 +79,7 @@ public class VMProcess extends UserProcess {
 			boolean readOnly = section.isReadOnly();
 
 			for (int i = 0; i < section.getLength(); i++) {
-				int vpn = section.getFirstVPN() + 1;
+				int vpn = section.getFirstVPN() + i;
 				vpnCounter = vpn;
 				// If the page matches the bad vpn
 				if (vpn == badVpn) {
@@ -101,7 +101,7 @@ public class VMProcess extends UserProcess {
 						}
 
 					} catch (NoSuchElementException e) {
-						System.out.println("Exceptopn, No available physical page for process " + pid);
+						System.out.println("Exception, No available physical page for process " + pid);
 						unloadSections();
 						VMKernel.pagesAvailableMutex.release();
 						handleException(-1);
@@ -133,7 +133,7 @@ public class VMProcess extends UserProcess {
 					}
 
 				} catch (NoSuchElementException e) {
-					System.out.println("Exceptopn, No available physical page for process " + pid);
+					System.out.println("Exception, No available physical page for process " + pid);
 					unloadSections();
 					VMKernel.pagesAvailableMutex.release();
 					handleException(-1);
