@@ -93,25 +93,25 @@ public class VMProcess extends UserProcess {
 					// Acquire lock for shared data structure
 					VMKernel.pagesAvailableMutex.acquire();
 					// Check if there's no free physical pages
-					if (UserKernel.pagesAvailable.isEmpty()) {
+					if (!UserKernel.pagesAvailable.isEmpty()) {
+						ppn = UserKernel.pagesAvailable.removeLast();
+					} else {
 						VMKernel.pagesAvailableMutex.release();
 						System.out.println("Run out of physical memory without swap");
 						return;
 						// TODO evict page
-					} else {
-						ppn = UserKernel.pagesAvailable.removeLast();
 					}
 					VMKernel.pagesAvailableMutex.release();
 					// Initialize translationEntry
 					boolean dirty = pageTable[vpn].dirty;
 					System.out.println("Newly assigned ppn: " + ppn);
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
-					pageTable[vpn] = translationEntry;
 					// Handle swap in
 					if (dirty) {
 						handleSwapIn(vpn, ppn);
 					} else {
 						section.loadPage(i, ppn);
+						pageTable[vpn] = translationEntry;
 					}
 					if (readOnly) {
 						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
