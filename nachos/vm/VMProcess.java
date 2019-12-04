@@ -107,12 +107,14 @@ public class VMProcess extends UserProcess {
 					System.out.println("Newly assigned ppn: " + ppn);
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
 					// Handle swap in
-					if (dirty) {
-						handleSwapIn(vpn, ppn);
-					} else {
-						section.loadPage(i, ppn);
-						pageTable[vpn] = translationEntry;
-					}
+//					if (dirty) {
+//						handleSwapIn(vpn, ppn);
+//					} else {
+//						section.loadPage(i, ppn);
+//						pageTable[vpn] = translationEntry;
+//					}
+					section.loadPage(i, ppn);
+					pageTable[vpn] = translationEntry;
 					if (readOnly) {
 						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 					}
