@@ -53,7 +53,8 @@ public class VMProcess extends UserProcess {
 
 			/** Part 2 implementation here **/
 			// Here initialize valid to false and use dummy ppn (not allocate physical memory)
-			pageTable[i] = new TranslationEntry(i, -1, false, false, false, false);
+			// Initially used negative ppn but failed write10
+			pageTable[i] = new TranslationEntry(i, i, false, false, false, false);
 		}
 		//UserKernel.pagesAvailableMutex.release();
 		return true;
@@ -219,16 +220,16 @@ public class VMProcess extends UserProcess {
 		// before the loop nothing is copied, variables should be at initial value
 		// each iteration should read a new page
 		while (totalRead < length) {
-			// check paddr
-			if (paddr < 0 || paddr >= memory.length) {
-				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
-				return totalRead;
-			}
 			// check if the page is valid
 			if (!entry.valid) {
 				System.out.println("readVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 				handlePageFault(vaddr);
 				// ???? what if the entry is still invalid ????
+			}
+			// check paddr
+			if (paddr < 0 || paddr >= memory.length) {
+				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalRead;
 			}
 			// update amount, only updated once
 			amount = Math.min(length - totalRead, pageSize - pageOffset);
@@ -308,10 +309,10 @@ public class VMProcess extends UserProcess {
 		// before the loop nothing is copied, variables should be at initial value
 		// each iteration should read a new page
 		while (totalWrite < length) {
-			// check paddr
-			if (paddr < 0 || paddr >= memory.length) {
-				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
-				return totalWrite;
+			// check if the page is valid
+			if (!entry.valid) {
+				System.out.println("writeVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				handlePageFault(vaddr);
 			}
 			// check if the page is valid
 			if (!entry.valid) {
