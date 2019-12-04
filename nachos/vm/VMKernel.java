@@ -52,16 +52,16 @@ public class VMKernel extends UserKernel {
 
 	private static final char dbgVM = 'v';
 
-	protected static Lock pagesAvailableMutex;
-
-	protected static LinkedList<Integer> pagesAvailable = new LinkedList<>();
-
-	protected static int pidCounter;
-
-	protected static Lock pidCounterMutex;
-
-	protected static int runningProcessCounter;
-
-	protected static Lock runningProcessCounterMutex;
+//	protected static Lock pagesAvailableMutex;
+//
+//	protected static LinkedList<Integer> pagesAvailable = new LinkedList<>();
+//
+//	protected static int pidCounter;
+//
+//	protected static Lock pidCounterMutex;
+//
+//	protected static int runningProcessCounter;
+//
+//	protected static Lock runningProcessCounterMutex;
 
 }

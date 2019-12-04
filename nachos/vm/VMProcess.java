@@ -46,12 +46,12 @@ public class VMProcess extends UserProcess {
 		// Part 1 implementation here
 		// initialize page table
 		pageTable = new TranslationEntry[numPages];
-		VMKernel.pagesAvailableMutex.acquire();
+		UserKernel.pagesAvailableMutex.acquire();
 		for (int i = 0; i < numPages; i++) {
 			// Here initialize valid to false and not load sections from coff
-			pageTable[i] = new TranslationEntry(i, VMKernel.pagesAvailable.remove(), false, false, false, false);
+			pageTable[i] = new TranslationEntry(i, UserKernel.pagesAvailable.remove(), false, false, false, false);
 		}
-		VMKernel.pagesAvailableMutex.release();
+		UserKernel.pagesAvailableMutex.release();
 		return true;
 	}
 
