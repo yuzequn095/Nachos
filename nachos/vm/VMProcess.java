@@ -223,6 +223,9 @@ public class VMProcess extends UserProcess {
 				System.out.println("readVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 				handlePageFault(vaddr);
 				// ???? what if the entry is still invalid ????
+				if (!entry.valid) {
+					return totalRead;
+				}
 			}
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
@@ -311,6 +314,9 @@ public class VMProcess extends UserProcess {
 			if (!entry.valid) {
 				System.out.println("writeVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 				handlePageFault(vaddr);
+				if (!entry.valid) {
+					return totalWrite;
+				}
 			}
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
