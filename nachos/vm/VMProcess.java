@@ -80,6 +80,7 @@ public class VMProcess extends UserProcess {
 
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
+				System.out.println("VPN: " + vpn);
 				vpnCounter = vpn;
 				// If the page matches the bad vpn
 				if (vpn == badVpn) {
