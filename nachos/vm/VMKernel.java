@@ -23,6 +23,7 @@ public class VMKernel extends UserKernel {
 	 */
 	public void initialize(String[] args) {
 		super.initialize(args);
+		pagesAvailableMutex = new Lock();
 	}
 
 	/**
@@ -51,7 +52,7 @@ public class VMKernel extends UserKernel {
 
 	private static final char dbgVM = 'v';
 
-	protected static Lock pagesAvailableMutex = new Lock();
+	protected static Lock pagesAvailableMutex;
 
 	protected static LinkedList<Integer> pagesAvailable = new LinkedList<>();
 
