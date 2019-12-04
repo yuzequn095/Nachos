@@ -93,28 +93,25 @@ public class VMProcess extends UserProcess {
 					// Acquire lock for shared data structure
 					VMKernel.pagesAvailableMutex.acquire();
 					// Check if there's no free physical pages
-					if (!UserKernel.pagesAvailable.isEmpty()) {
-						ppn = UserKernel.pagesAvailable.removeLast();
-					} else {
+					if (UserKernel.pagesAvailable.isEmpty()) {
 						VMKernel.pagesAvailableMutex.release();
 						System.out.println("Run out of physical memory without swap");
-						return;
 						// TODO evict page
+					} else {
+						ppn = UserKernel.pagesAvailable.removeLast();
 					}
 					VMKernel.pagesAvailableMutex.release();
 					// Initialize translationEntry
 					boolean dirty = pageTable[vpn].dirty;
 					System.out.println("Newly assigned ppn: " + ppn);
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
-					// Handle swap in
-//					if (dirty) {
-//						handleSwapIn(vpn, ppn);
-//					} else {
-//						section.loadPage(i, ppn);
-//						pageTable[vpn] = translationEntry;
-//					}
-					section.loadPage(i, ppn);
 					pageTable[vpn] = translationEntry;
+					// Handle swap in
+					if (dirty) {
+						handleSwapIn(vpn, ppn);
+					} else {
+						section.loadPage(i, ppn);
+					}
 					if (readOnly) {
 						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 					}
@@ -136,7 +133,6 @@ public class VMProcess extends UserProcess {
 				if (UserKernel.pagesAvailable.isEmpty()) {
 					VMKernel.pagesAvailableMutex.release();
 					System.out.println("Run out of physical memory without swap");
-					return;
 					// TODO evict page
 				} else {
 					ppn = UserKernel.pagesAvailable.removeLast();
