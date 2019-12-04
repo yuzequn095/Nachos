@@ -42,16 +42,20 @@ public class VMProcess extends UserProcess {
 	 * @return <tt>true</tt> if successful.
 	 */
 	protected boolean loadSections() {
-		//return super.loadSections();
-		// Part 1 implementation here
 		// initialize page table
 		pageTable = new TranslationEntry[numPages];
-		UserKernel.pagesAvailableMutex.acquire();
+		/**No mutex needed for part 2**/
+		//UserKernel.pagesAvailableMutex.acquire();
 		for (int i = 0; i < numPages; i++) {
+			/** Part 1 implementation here **/
 			// Here initialize valid to false and not load sections from coff
-			pageTable[i] = new TranslationEntry(i, UserKernel.pagesAvailable.remove(), false, false, false, false);
+			// pageTable[i] = new TranslationEntry(i, UserKernel.pagesAvailable.remove(), false, false, false, false);
+
+			/** Part 2 implementation here **/
+			// Here initialize valid to false and use dummy ppn (not allocate physical memory)
+			pageTable[i] = new TranslationEntry(i, -1, false, false, false, false);
 		}
-		UserKernel.pagesAvailableMutex.release();
+		//UserKernel.pagesAvailableMutex.release();
 		return true;
 	}
 
@@ -84,32 +88,29 @@ public class VMProcess extends UserProcess {
 				vpnCounter = vpn;
 				// If the page matches the bad vpn
 				if (vpn == badVpn) {
+					int ppn = -1;
 					// Acquire lock for shared data structure
 					VMKernel.pagesAvailableMutex.acquire();
-					// int ppn = VMKernel.pagesAvailable.removeLast();
-					try {
-						TranslationEntry translationEntry = pageTable[vpn];
-						int ppn = translationEntry.ppn;
-						// Handle swap in
-						if (translationEntry.dirty) {
-							handleSwapIn(vpn, ppn);
-						} else {
-							section.loadPage(i, ppn);
-						}
-						translationEntry.readOnly = readOnly;
-						translationEntry.valid = true;
-						if (readOnly) {
-							System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
-						}
-
-					} catch (NoSuchElementException e) {
-						System.out.println("Exception, No available physical page for process " + pid);
-						unloadSections();
-						VMKernel.pagesAvailableMutex.release();
-						handleException(-1);
+					// Check if there's no free physical pages
+					if (UserKernel.pagesAvailable.isEmpty()) {
 						return;
+						// TODO evict page
+					} else {
+						ppn = UserKernel.pagesAvailable.removeLast();
 					}
 					VMKernel.pagesAvailableMutex.release();
+					// Initialize translationEntry
+					boolean dirty = pageTable[vpn].dirty;
+					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
+					// Handle swap in
+					if (dirty) {
+						handleSwapIn(vpn, ppn);
+					} else {
+						section.loadPage(i, ppn);
+					}
+					if (readOnly) {
+						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
+					}
 					return;
 				}
 			}
@@ -226,23 +227,17 @@ public class VMProcess extends UserProcess {
 			amount = Math.min(length - totalRead, pageSize - pageOffset);
 			// actual copy
 			System.arraycopy(memory, paddr, data, offset, amount);
+			// update used bit (Proj3 part 2)
+			entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
-			//TranslationEntry entryOld = entry;
-			//entry = pageTable[Processor.pageFromAddress(vaddr)];
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
 				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length + "length: " + length + "total read: " + totalRead);
 				return totalRead;
 			}
-			// for debug
-			TranslationEntry entryOld = entry;
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
-			// debug
-			//Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
 			pageOffset = Processor.offsetFromAddress(vaddr);
-			// debug
-			//Lib.assertTrue(pageOffset == 0);
 			paddr = entry.ppn * pageSize + pageOffset;
 			// update cumulative variables
 			offset += amount;
@@ -325,23 +320,17 @@ public class VMProcess extends UserProcess {
 			amount = Math.min(length - totalWrite, pageSize - pageOffset);
 			// actual copy
 			System.arraycopy(data, offset, memory, paddr, amount);
+			// update used bit (Proj3 part2)
+			entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
-			//TranslationEntry entryOld = entry;
-			//entry = pageTable[Processor.pageFromAddress(vaddr)];
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
 				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length);
 				return totalWrite;
 			}
-			// for debug
-			TranslationEntry entryOld = entry;
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
-			// debug
-			// Lib.assertTrue(entryOld.vpn+1 == entry.vpn);
 			pageOffset = Processor.offsetFromAddress(vaddr);
-			// debug
-			// Lib.assertTrue(pageOffset == 0);
 			paddr = entry.ppn * pageSize + pageOffset;
 			// update cumulative variables
 			offset += amount;
