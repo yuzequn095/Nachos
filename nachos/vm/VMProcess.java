@@ -98,7 +98,7 @@ public class VMProcess extends UserProcess {
 						System.out.println("Run out of physical memory without swap");
 						// TODO evict page
 					} else {
-						ppn = UserKernel.pagesAvailable.removeLast();
+						ppn = UserKernel.pagesAvailable.remove();
 					}
 					VMKernel.pagesAvailableMutex.release();
 					// Initialize translationEntry
@@ -135,7 +135,7 @@ public class VMProcess extends UserProcess {
 					System.out.println("Run out of physical memory without swap");
 					// TODO evict page
 				} else {
-					ppn = UserKernel.pagesAvailable.removeLast();
+					ppn = UserKernel.pagesAvailable.remove();
 				}
 				VMKernel.pagesAvailableMutex.release();
 				// Initialize translationEntry
@@ -312,10 +312,10 @@ public class VMProcess extends UserProcess {
 				System.out.println("writeVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 				handlePageFault(vaddr);
 			}
-			// check if the page is valid
-			if (!entry.valid) {
-				System.out.println("writeVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
-				handlePageFault(vaddr);
+			// check paddr
+			if (paddr < 0 || paddr >= memory.length) {
+				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				return totalWrite;
 			}
 			// check if the page is read_only
 			if (entry.readOnly) {
