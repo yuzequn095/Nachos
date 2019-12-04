@@ -1183,7 +1183,7 @@ public class UserProcess {
 	/** The array contains all fileDescriptor. */
 	protected OpenFile[] fileDescriptors;
 
-	private int pid;
+	protected int pid;
     
 	private int initialPC, initialSP;
 

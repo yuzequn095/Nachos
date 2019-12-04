@@ -5,6 +5,8 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
+import java.util.LinkedList;
+
 /**
  * A kernel that can support multiple demand-paging user processes.
  */
@@ -48,4 +50,17 @@ public class VMKernel extends UserKernel {
 	private static VMProcess dummy1 = null;
 
 	private static final char dbgVM = 'v';
+
+	protected static Lock pagesAvailableMutex = new Lock();
+
+	protected static LinkedList<Integer> pagesAvailable = new LinkedList<>();
+
+	protected static int pidCounter;
+
+	protected static Lock pidCounterMutex;
+
+	protected static int runningProcessCounter;
+
+	protected static Lock runningProcessCounterMutex;
+
 }
