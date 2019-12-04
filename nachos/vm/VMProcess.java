@@ -93,6 +93,7 @@ public class VMProcess extends UserProcess {
 					VMKernel.pagesAvailableMutex.acquire();
 					// Check if there's no free physical pages
 					if (UserKernel.pagesAvailable.isEmpty()) {
+						VMKernel.pagesAvailableMutex.release();
 						return;
 						// TODO evict page
 					} else {
@@ -124,26 +125,28 @@ public class VMProcess extends UserProcess {
 				// Acquire lock for shared data structure
 				VMKernel.pagesAvailableMutex.acquire();
 				// int ppn = VMKernel.pagesAvailable.removeLast();
-				try {
-					TranslationEntry translationEntry = pageTable[vpn];
-					int ppn = translationEntry.ppn;
-					// Handle swap in
-					if (translationEntry.dirty) {
-						handleSwapIn(vpn, ppn);
-					} else {
-						// Fill the physical memory with 0
-						fillWithZero(ppn);
-					}
-					translationEntry.valid = true;
-
-				} catch (NoSuchElementException e) {
-					System.out.println("Exception, No available physical page for process " + pid);
-					unloadSections();
+				int ppn = -1;
+				// Acquire lock for shared data structure
+				VMKernel.pagesAvailableMutex.acquire();
+				// Check if there's no free physical pages
+				if (UserKernel.pagesAvailable.isEmpty()) {
 					VMKernel.pagesAvailableMutex.release();
-					handleException(-1);
 					return;
+					// TODO evict page
+				} else {
+					ppn = UserKernel.pagesAvailable.removeLast();
 				}
 				VMKernel.pagesAvailableMutex.release();
+				// Initialize translationEntry
+				boolean dirty = pageTable[vpn].dirty;
+				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, false, dirty);
+				// Handle swap in
+				if (translationEntry.dirty) {
+					handleSwapIn(vpn, ppn);
+				} else {
+					// Fill the physical memory with 0
+					fillWithZero(ppn);
+				}
 				return;
 			}
 		}
