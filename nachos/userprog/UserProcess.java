@@ -603,6 +603,7 @@ public class UserProcess {
 		UserKernel.runningProcessCounterMutex.release();
 		KThread.finish();
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
+		System.out.println("UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
 		return 0;
 	}
