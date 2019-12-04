@@ -103,6 +103,7 @@ public class VMProcess extends UserProcess {
 					// Initialize translationEntry
 					boolean dirty = pageTable[vpn].dirty;
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
+					pageTable[vpn] = translationEntry;
 					// Handle swap in
 					if (dirty) {
 						handleSwapIn(vpn, ppn);
@@ -140,6 +141,7 @@ public class VMProcess extends UserProcess {
 				// Initialize translationEntry
 				boolean dirty = pageTable[vpn].dirty;
 				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, false, dirty);
+				pageTable[vpn] = translationEntry;
 				// Handle swap in
 				if (translationEntry.dirty) {
 					handleSwapIn(vpn, ppn);
