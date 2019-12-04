@@ -97,6 +97,7 @@ public class VMProcess extends UserProcess {
 							section.loadPage(i, ppn);
 						}
 						translationEntry.readOnly = readOnly;
+						translationEntry.valid = true;
 						if (readOnly) {
 							System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 						}
@@ -132,6 +133,7 @@ public class VMProcess extends UserProcess {
 						// Fill the physical memory with 0
 						fillWithZero(ppn);
 					}
+					translationEntry.valid = true;
 
 				} catch (NoSuchElementException e) {
 					System.out.println("Exception, No available physical page for process " + pid);
