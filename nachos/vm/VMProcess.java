@@ -89,7 +89,7 @@ public class VMProcess extends UserProcess {
 				vpnCounter = vpn;
 				// If the page matches the bad vpn
 				if (vpn == badVpn) {
-					int ppn = -1;
+					int ppn = 0;
 					// Acquire lock for shared data structure
 					VMKernel.pagesAvailableMutex.acquire();
 					// Check if there's no free physical pages
@@ -127,7 +127,7 @@ public class VMProcess extends UserProcess {
 			// If the page matches the bad vpn
 			if (vpn == badVpn) {
 				// int ppn = VMKernel.pagesAvailable.removeLast();
-				int ppn = -1;
+				int ppn = 0;
 				// Acquire lock for shared data structure
 				VMKernel.pagesAvailableMutex.acquire();
 				// Check if there's no free physical pages
