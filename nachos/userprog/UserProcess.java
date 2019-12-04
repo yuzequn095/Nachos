@@ -566,7 +566,7 @@ public class UserProcess {
 		Machine.autoGrader().finishingCurrentProcess(status);
 		// ...and leave it as the top of handleExit so that we
 		// can grade your implementation.
-
+		System.out.println("UserProcess.handleExit (" + status + ")");
 		// close all file descriptors
 		for (OpenFile openedFile : fileDescriptors) {
 			if (openedFile != null) {
@@ -603,6 +603,7 @@ public class UserProcess {
 		UserKernel.runningProcessCounterMutex.release();
 		KThread.finish();
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
+		System.out.println("UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
 		return 0;
 	}
@@ -1183,7 +1184,7 @@ public class UserProcess {
 	/** The array contains all fileDescriptor. */
 	protected OpenFile[] fileDescriptors;
 
-	private int pid;
+	protected int pid;
     
 	private int initialPC, initialSP;
 
