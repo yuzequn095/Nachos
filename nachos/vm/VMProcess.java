@@ -123,8 +123,6 @@ public class VMProcess extends UserProcess {
 		for (int vpn = vpnCounter + 1; vpn < numPages; vpn++) {
 			// If the page matches the bad vpn
 			if (vpn == badVpn) {
-				// Acquire lock for shared data structure
-				VMKernel.pagesAvailableMutex.acquire();
 				// int ppn = VMKernel.pagesAvailable.removeLast();
 				int ppn = -1;
 				// Acquire lock for shared data structure
