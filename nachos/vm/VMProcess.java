@@ -94,6 +94,7 @@ public class VMProcess extends UserProcess {
 					// Check if there's no free physical pages
 					if (UserKernel.pagesAvailable.isEmpty()) {
 						VMKernel.pagesAvailableMutex.release();
+						System.out.println("Run out of physical memory without swap");
 						return;
 						// TODO evict page
 					} else {
@@ -102,6 +103,7 @@ public class VMProcess extends UserProcess {
 					VMKernel.pagesAvailableMutex.release();
 					// Initialize translationEntry
 					boolean dirty = pageTable[vpn].dirty;
+					System.out.println("Newly assigned ppn: " + ppn);
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
 					pageTable[vpn] = translationEntry;
 					// Handle swap in
@@ -130,6 +132,7 @@ public class VMProcess extends UserProcess {
 				// Check if there's no free physical pages
 				if (UserKernel.pagesAvailable.isEmpty()) {
 					VMKernel.pagesAvailableMutex.release();
+					System.out.println("Run out of physical memory without swap");
 					return;
 					// TODO evict page
 				} else {
@@ -138,6 +141,7 @@ public class VMProcess extends UserProcess {
 				VMKernel.pagesAvailableMutex.release();
 				// Initialize translationEntry
 				boolean dirty = pageTable[vpn].dirty;
+				System.out.println("Newly assigned ppn: " + ppn);
 				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, false, dirty);
 				pageTable[vpn] = translationEntry;
 				// Handle swap in
