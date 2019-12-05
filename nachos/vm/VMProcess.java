@@ -97,8 +97,15 @@ public class VMProcess extends UserProcess {
 						VMKernel.pagesAvailableMutex.release();
 						System.out.println("Run out of physical memory without swap");
 						// TODO evict page
+						ppn = evictPage();
+						if (ppn < 0) {
+							System.out.println("Evict unsuccessful!");
+							return;
+						}
 					} else {
+						// Allocate new physical page
 						ppn = UserKernel.pagesAvailable.remove();
+
 					}
 					VMKernel.pagesAvailableMutex.release();
 					// Initialize translationEntry
@@ -106,6 +113,8 @@ public class VMProcess extends UserProcess {
 					System.out.println("Newly assigned ppn: " + ppn);
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
 					pageTable[vpn] = translationEntry;
+					// add vpn to victims
+					VMKernel.victims.add(vpn);
 					// Handle swap in
 					if (dirty) {
 						handleSwapIn(vpn, ppn);
@@ -125,7 +134,6 @@ public class VMProcess extends UserProcess {
 		for (int vpn = vpnCounter + 1; vpn < numPages; vpn++) {
 			// If the page matches the bad vpn
 			if (vpn == badVpn) {
-				// int ppn = VMKernel.pagesAvailable.removeLast();
 				int ppn = -1;
 				// Acquire lock for shared data structure
 				VMKernel.pagesAvailableMutex.acquire();
@@ -134,6 +142,11 @@ public class VMProcess extends UserProcess {
 					VMKernel.pagesAvailableMutex.release();
 					System.out.println("Run out of physical memory without swap");
 					// TODO evict page
+					ppn = evictPage();
+					if (ppn < 0) {
+						System.out.println("Evict unsuccessful!");
+						return;
+					}
 				} else {
 					ppn = UserKernel.pagesAvailable.remove();
 				}
@@ -159,10 +172,54 @@ public class VMProcess extends UserProcess {
 		handleException(-1);
 	}
 
+	private void handleSwapOut(int vpn) {
+
+	}
+
 	private void fillWithZero(int ppn) {
 		byte[] data = new byte[Processor.pageSize];
 		Arrays.fill(data, (byte) 0);
 		System.arraycopy(data, 0, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), Processor.pageSize);
+	}
+
+	/**
+	 * Evicts a physical page from memory for reuse
+	 * @return the ppn of the evicted page for resuse
+	 */
+	private int evictPage() {
+		// TODO check if all pages are pinned
+		int vpn;
+		int ppn = -1;
+		// pick a page to evict
+		for (int i = 0; i < VMKernel.victims.size(); i++) {
+			// for potential concurrency issue
+			if (VMKernel.victims.get(i) == null) {
+				continue;
+			}
+			vpn = VMKernel.victims.get(i);
+			// TODO check if the page is pinned
+			if (false) {
+				continue;
+			}
+			TranslationEntry translationEntry = pageTable[vpn];
+			// acquire lock for modifying shared data structure
+			VMKernel.victimLock.acquire();
+			// set to null to prevent race condition
+			VMKernel.victims.set(i, null);
+			VMKernel.victimLock.release();
+
+			// start to evict the page
+			// check of page is dirty
+			if (translationEntry.dirty) {
+				// swap out dirty page
+				handleSwapOut(vpn);
+			}
+			// processing complete, exit loop
+			ppn = translationEntry.ppn;
+			VMKernel.victims.remove(i);
+			break;
+		}
+		return ppn;
 	}
 
 	/**

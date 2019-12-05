@@ -5,6 +5,7 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 /**
@@ -24,6 +25,10 @@ public class VMKernel extends UserKernel {
 	public void initialize(String[] args) {
 		super.initialize(args);
 		pagesAvailableMutex = new Lock();
+		victimLock = new Lock();
+		victims = new ArrayList<>();
+		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
+		spnTotal = 0;
 	}
 
 	/**
@@ -63,5 +68,13 @@ public class VMKernel extends UserKernel {
 //	protected static int runningProcessCounter;
 //
 //	protected static Lock runningProcessCounterMutex;
+
+	static ArrayList<Integer> victims;
+
+	static Lock victimLock;
+
+	static OpenFile swapFile;
+
+	static int spnTotal;
 
 }
