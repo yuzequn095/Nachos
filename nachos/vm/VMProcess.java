@@ -331,6 +331,7 @@ public class VMProcess extends UserProcess {
 				// update paddr
 				entry = pageTable[entry.vpn];
 				paddr = entry.ppn * pageSize + pageOffset;
+				System.out.println("readVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 			}
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
@@ -422,6 +423,7 @@ public class VMProcess extends UserProcess {
 				// update paddr
 				entry = pageTable[entry.vpn];
 				paddr = entry.ppn * pageSize + pageOffset;
+				System.out.println("writeVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 			}
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
