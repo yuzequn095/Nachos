@@ -6,6 +6,7 @@ import nachos.userprog.*;
 import nachos.vm.*;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.NoSuchElementException;
 
 /**
@@ -17,6 +18,7 @@ public class VMProcess extends UserProcess {
 	 */
 	public VMProcess() {
 		super();
+		vpnSpnMap = new HashMap<>();
 	}
 
 	/**
@@ -169,17 +171,36 @@ public class VMProcess extends UserProcess {
 	}
 
 	private void handleSwapIn(int vpn, int ppn) {
-		handleException(-1);
+		VMKernel.swapLock.acquire();
+		int spn = vpnSpnMap.get(vpn);
+		VMKernel.swapFile.read( spn* pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
+		VMKernel.swapPages.add(spn);
+		VMKernel.swapLock.release();
 	}
 
-	private void handleSwapOut(int vpn) {
-
+	private void handleSwapOut(int vpn, int ppn) {
+		VMKernel.swapLock.acquire();
+		int spn = 0;
+		if (VMKernel.swapPages.isEmpty()) {
+			// assign the new spn
+			spn = VMKernel.spnTotal;
+			// increase swap file size by one page
+			VMKernel.spnTotal++;
+		} else {
+			// assign spn to
+			spn = VMKernel.swapPages.remove();
+		}
+		// swap out page
+		VMKernel.swapFile.write(spn * pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
+		// update map
+		vpnSpnMap.put(vpn, spn);
+		VMKernel.swapLock.release();
 	}
 
 	private void fillWithZero(int ppn) {
-		byte[] data = new byte[Processor.pageSize];
+		byte[] data = new byte[pageSize];
 		Arrays.fill(data, (byte) 0);
-		System.arraycopy(data, 0, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), Processor.pageSize);
+		System.arraycopy(data, 0, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
 	}
 
 	/**
@@ -210,12 +231,12 @@ public class VMProcess extends UserProcess {
 
 			// start to evict the page
 			// check of page is dirty
+			ppn = translationEntry.ppn;
 			if (translationEntry.dirty) {
 				// swap out dirty page
-				handleSwapOut(vpn);
+				handleSwapOut(vpn, ppn);
 			}
 			// processing complete, exit loop
-			ppn = translationEntry.ppn;
 			VMKernel.victims.remove(i);
 			break;
 		}
@@ -434,4 +455,6 @@ public class VMProcess extends UserProcess {
 	private static final char dbgProcess = 'a';
 
 	private static final char dbgVM = 'v';
+
+	private static HashMap<Integer, Integer> vpnSpnMap;
 }
