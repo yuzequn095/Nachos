@@ -5,6 +5,7 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
+import javax.swing.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -32,6 +33,13 @@ public class VMKernel extends UserKernel {
 		swapPages = new LinkedList<>();
 		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
 		spnTotal = 0;
+		victim = 0;
+
+		// initialize manager
+		manager = new pageManager[Machine.processor().getNumPhysPages()];
+		for(int i = 0; i < Machine.processor().getNumPhysPages(); i++){
+			manager[i] = new pageManager(null);
+		}
 	}
 
 	/**
@@ -74,6 +82,8 @@ public class VMKernel extends UserKernel {
 
 	static ArrayList<TranslationEntry> victims;
 
+	static int victim;
+
 	static Lock victimLock;
 
 	static OpenFile swapFile;
@@ -83,5 +93,15 @@ public class VMKernel extends UserKernel {
 	static LinkedList<Integer> swapPages;
 
 	static Lock swapLock;
+
+	class pageManager {
+		public TranslationEntry translationEntry;
+
+		public pageManager(TranslationEntry entry) {
+			translationEntry = entry;
+		}
+	}
+
+	static pageManager[] manager;
 
 }

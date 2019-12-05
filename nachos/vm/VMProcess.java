@@ -113,7 +113,7 @@ public class VMProcess extends UserProcess {
 					// Initialize translationEntry
 					boolean dirty = pageTable[vpn].dirty;
 					System.out.println("Newly assigned ppn: " + ppn);
-					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
+					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, true, dirty);
 					pageTable[vpn] = translationEntry;
 					// add vpn to victims
 					VMKernel.victims.add(translationEntry);
@@ -126,6 +126,7 @@ public class VMProcess extends UserProcess {
 					if (readOnly) {
 						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 					}
+					VMKernel.manager[ppn].translationEntry = translationEntry;
 					return;
 				}
 			}
@@ -156,7 +157,7 @@ public class VMProcess extends UserProcess {
 				// Initialize translationEntry
 				boolean dirty = pageTable[vpn].dirty;
 				System.out.println("Newly assigned ppn: " + ppn);
-				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, false, dirty);
+				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, true, dirty);
 				pageTable[vpn] = translationEntry;
 				// add vpn to victims
 				VMKernel.victims.add(translationEntry);
@@ -167,6 +168,7 @@ public class VMProcess extends UserProcess {
 					// Fill the physical memory with 0
 					fillWithZero(ppn);
 				}
+				VMKernel.manager[ppn].translationEntry = translationEntry;
 				return;
 			}
 		}
@@ -218,38 +220,52 @@ public class VMProcess extends UserProcess {
 		int vpn;
 		int ppn = -1;
 		// pick a page to evict
-		for (int i = 0; i < VMKernel.victims.size(); i++) {
-			System.out.println("Iterating victim: " + i + "...");
-			// for potential concurrency issue
-			if (VMKernel.victims.get(i) == null) {
-				System.out.println("Another process is evicting this page, continue");
-				continue;
-			}
-			TranslationEntry tempEntry = VMKernel.victims.get(i);
-			vpn = tempEntry.vpn;
-			ppn = tempEntry.ppn;
+		// clock
+		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++) {
+			System.out.println("Iterating victim ppn: " + i + "...");
 			// TODO check if the page is pinned
 			if (false) {
 				continue;
 			}
-			System.out.println("Target victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
-			// acquire lock for modifying shared data structure
-			VMKernel.victimLock.acquire();
-			// set to null to prevent race condition
-			VMKernel.victims.set(i, null);
-			VMKernel.victimLock.release();
-
-			// start to evict the page
-			// check of page is dirty
-			if (tempEntry.dirty) {
-				// swap out dirty page
-				handleSwapOut(vpn, ppn);
+			if (!VMKernel.manager[i].translationEntry.used) {
+				ppn = i;
+				break;
 			}
-			// processing complete, exit loop
-			VMKernel.victims.remove(i);
-			System.out.println("Eviction successful!");
-			break;
+			VMKernel.manager[i].translationEntry.used = false;
+			if (i == Machine.processor().getNumPhysPages() - 1) {
+				i = 0;
+			}
 		}
+
+/*		System.out.println("Iterating victim: " + i + "...");
+		// for potential concurrency issue
+		if (VMKernel.victims.get(i) == null) {
+			System.out.println("Another process is evicting this page, continue");
+			continue;
+		}
+*/
+
+		TranslationEntry tempEntry = VMKernel.manager[ppn].translationEntry;
+		vpn = tempEntry.vpn;
+		// ppn = tempEntry.ppn;
+
+		System.out.println("Target victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
+		// acquire lock for modifying shared data structure
+		VMKernel.victimLock.acquire();
+		// set to null to prevent race condition
+		// VMKernel.victims.set(i, null);
+		VMKernel.victimLock.release();
+
+		// start to evict the page
+		// check of page is dirty
+		if (tempEntry.dirty) {
+			// swap out dirty page
+			handleSwapOut(vpn, ppn);
+		}
+		// processing complete, exit loop
+		// VMKernel.victims.remove(i);
+		System.out.println("Eviction successful!");
+
 		return ppn;
 	}
 
@@ -325,7 +341,7 @@ public class VMProcess extends UserProcess {
 			// actual copy
 			System.arraycopy(memory, paddr, data, offset, amount);
 			// update used bit (Proj3 part 2)
-			entry.used = true;
+			// entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
@@ -421,7 +437,7 @@ public class VMProcess extends UserProcess {
 			// actual copy
 			System.arraycopy(data, offset, memory, paddr, amount);
 			// update used bit (Proj3 part2)
-			entry.used = true;
+			// entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
