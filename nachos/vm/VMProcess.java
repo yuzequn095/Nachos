@@ -158,6 +158,8 @@ public class VMProcess extends UserProcess {
 				System.out.println("Newly assigned ppn: " + ppn);
 				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, false, dirty);
 				pageTable[vpn] = translationEntry;
+				// add vpn to victims
+				VMKernel.victims.add(translationEntry);
 				// Handle swap in
 				if (translationEntry.dirty) {
 					handleSwapIn(vpn, ppn);
