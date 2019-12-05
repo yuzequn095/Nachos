@@ -147,7 +147,7 @@ public class VMProcess extends UserProcess {
 					ppn = evictPage();
 					if (ppn < 0) {
 						System.out.println("Evict unsuccessful!");
-						VMKernel.pagesAvailableMutex.release()
+						VMKernel.pagesAvailableMutex.release();
 						return;
 					}
 				} else {
