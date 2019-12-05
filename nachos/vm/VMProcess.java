@@ -342,7 +342,7 @@ public class VMProcess extends UserProcess {
 			// actual copy
 			System.arraycopy(memory, paddr, data, offset, amount);
 			// update used bit (Proj3 part 2)
-			// entry.used = true;
+			entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
@@ -438,7 +438,7 @@ public class VMProcess extends UserProcess {
 			// actual copy
 			System.arraycopy(data, offset, memory, paddr, amount);
 			// update used bit (Proj3 part2)
-			// entry.used = true;
+			entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
