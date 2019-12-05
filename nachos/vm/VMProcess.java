@@ -447,6 +447,7 @@ public class VMProcess extends UserProcess {
 			System.arraycopy(data, offset, memory, paddr, amount);
 			// update used bit (Proj3 part2)
 			entry.used = true;
+			entry.dirty = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
