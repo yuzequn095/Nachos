@@ -247,8 +247,9 @@ public class VMProcess extends UserProcess {
 
 		TranslationEntry tempEntry = VMKernel.manager[ppn].translationEntry;
 		vpn = tempEntry.vpn;
-		// ppn = tempEntry.ppn;
-
+		ppn = tempEntry.ppn;
+		tempEntry.valid = false;
+		Lib.assertTrue(tempEntry.valid == VMKernel.manager[ppn].translationEntry.valid);
 		System.out.println("Target victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
 		// acquire lock for modifying shared data structure
 		VMKernel.victimLock.acquire();
