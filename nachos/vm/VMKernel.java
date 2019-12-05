@@ -72,7 +72,7 @@ public class VMKernel extends UserKernel {
 //
 //	protected static Lock runningProcessCounterMutex;
 
-	static ArrayList<Integer> victims;
+	static ArrayList<TranslationEntry> victims;
 
 	static Lock victimLock;
 

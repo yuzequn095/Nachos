@@ -116,7 +116,7 @@ public class VMProcess extends UserProcess {
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, false, dirty);
 					pageTable[vpn] = translationEntry;
 					// add vpn to victims
-					VMKernel.victims.add(vpn);
+					VMKernel.victims.add(translationEntry);
 					// Handle swap in
 					if (dirty) {
 						handleSwapIn(vpn, ppn);
@@ -171,6 +171,7 @@ public class VMProcess extends UserProcess {
 	}
 
 	private void handleSwapIn(int vpn, int ppn) {
+		System.out.println("Swapping in! target's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
 		VMKernel.swapLock.acquire();
 		int spn = vpnSpnMap.get(vpn);
 		VMKernel.swapFile.read( spn* pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
@@ -179,6 +180,7 @@ public class VMProcess extends UserProcess {
 	}
 
 	private void handleSwapOut(int vpn, int ppn) {
+		System.out.println("Swapping out! victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
 		VMKernel.swapLock.acquire();
 		int spn = 0;
 		if (VMKernel.swapPages.isEmpty()) {
@@ -190,6 +192,7 @@ public class VMProcess extends UserProcess {
 			// assign spn to
 			spn = VMKernel.swapPages.remove();
 		}
+		System.out.println("handleSwapOut: spn [" + spn + "]");
 		// swap out page
 		VMKernel.swapFile.write(spn * pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
 		// update map
@@ -209,20 +212,25 @@ public class VMProcess extends UserProcess {
 	 */
 	private int evictPage() {
 		// TODO check if all pages are pinned
+		System.out.println("Starting evict page!");
 		int vpn;
 		int ppn = -1;
 		// pick a page to evict
 		for (int i = 0; i < VMKernel.victims.size(); i++) {
+			System.out.println("Iterating victim: " + i + "...");
 			// for potential concurrency issue
 			if (VMKernel.victims.get(i) == null) {
+				System.out.println("Another process is evicting this page, continue");
 				continue;
 			}
-			vpn = VMKernel.victims.get(i);
+			TranslationEntry tempEntry = VMKernel.victims.get(i);
+			vpn = tempEntry.vpn;
+			ppn = tempEntry.ppn;
 			// TODO check if the page is pinned
 			if (false) {
 				continue;
 			}
-			TranslationEntry translationEntry = pageTable[vpn];
+			System.out.println("Target victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
 			// acquire lock for modifying shared data structure
 			VMKernel.victimLock.acquire();
 			// set to null to prevent race condition
@@ -231,13 +239,13 @@ public class VMProcess extends UserProcess {
 
 			// start to evict the page
 			// check of page is dirty
-			ppn = translationEntry.ppn;
-			if (translationEntry.dirty) {
+			if (tempEntry.dirty) {
 				// swap out dirty page
 				handleSwapOut(vpn, ppn);
 			}
 			// processing complete, exit loop
 			VMKernel.victims.remove(i);
+			System.out.println("Eviction successful!");
 			break;
 		}
 		return ppn;
