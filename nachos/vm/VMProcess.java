@@ -96,7 +96,7 @@ public class VMProcess extends UserProcess {
 					VMKernel.pagesAvailableMutex.acquire();
 					// Check if there's no free physical pages
 					if (UserKernel.pagesAvailable.isEmpty()) {
-						System.out.println("Run out of physical memory without swap");
+						System.out.println("Run out of physical memory without swap vpn: " + vpn);
 						// TODO evict page
 						ppn = evictPage();
 						if (ppn < 0) {
@@ -142,7 +142,7 @@ public class VMProcess extends UserProcess {
 				// Check if there's no free physical pages
 				if (UserKernel.pagesAvailable.isEmpty()) {
 					VMKernel.pagesAvailableMutex.release();
-					System.out.println("Run out of physical memory without swap");
+					System.out.println("Run out of physical memory without swap vpn: " + vpn);
 					// TODO evict page
 					ppn = evictPage();
 					if (ppn < 0) {
