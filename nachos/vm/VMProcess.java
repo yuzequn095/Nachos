@@ -77,6 +77,7 @@ public class VMProcess extends UserProcess {
 	 */
 	private void handlePageFault(int badVaddr) {
 		int vpn = Processor.pageFromAddress(badVaddr);
+		System.out.println("Vpn at start of handlePageFault: " + vpn);
 		// Find the corresponding coff section from badvaddr
 		Pair pair = sectionFinder(badVaddr);
 		CoffSection section = pair.getSection();
