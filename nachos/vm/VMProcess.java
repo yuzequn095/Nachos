@@ -130,9 +130,13 @@ public class VMProcess extends UserProcess {
 			VMKernel.pagesAvailableMutex.release();
 		} else {
 			if (section != null) {
+				VMKernel.pagesAvailableMutex.acquire();
 				section.loadPage(sectionPageNumber, ppn);
+				VMKernel.pagesAvailableMutex.release();
 			} else {
+				VMKernel.pagesAvailableMutex.acquire();
 				fillWithZero(ppn);
+				VMKernel.pagesAvailableMutex.release();
 			}
 		}
 		if (readOnly) {
