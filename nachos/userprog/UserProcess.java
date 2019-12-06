@@ -82,7 +82,7 @@ public class UserProcess {
 	 * @return <tt>true</tt> if the program was successfully executed.
 	 */
 	public boolean execute(String name, String[] args) {
-		System.out.println("Try to execute filename: " + name + " args: " + args.toString()ß);
+		System.out.println("Try to execute filename: " + name + " args: " + args.toString());
 		if (!load(name, args))
 			return false;
 
