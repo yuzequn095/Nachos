@@ -191,17 +191,9 @@ public class VMProcess extends UserProcess {
 		System.arraycopy(data, 0, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
 	}
 
-	/**
-	 * Evicts a physical page from memory for reuse
-	 * @return the ppn of the evicted page for resuse
-	 */
-	private int evictPage() {
-		// TODO check if all pages are pinned
-		System.out.println("Starting evict page!");
-		int vpn;
-		int ppn = -1;
-		// pick a page to evict
+	private int victimFinder() {
 		// clock
+		int ppn = -1;
 		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++) {
 			System.out.println("Iterating victim ppn: " + i + "...");
 			// TODO check if the page is pinned
@@ -219,6 +211,19 @@ public class VMProcess extends UserProcess {
 				i = 0;
 			}
 		}
+		return ppn;
+	}
+
+	/**
+	 * Evicts a physical page from memory for reuse
+	 * @return the ppn of the evicted page for resuse
+	 */
+	private int evictPage() {
+		// TODO check if all pages are pinned
+		System.out.println("Starting evict page!");
+		int vpn;
+		// pick a page to evict
+		int ppn = victimFinder();
 
 		TranslationEntry tempEntry = VMKernel.manager[ppn].getEntry();
 		vpn = tempEntry.vpn;
@@ -457,11 +462,11 @@ public class VMProcess extends UserProcess {
 
 	private static HashMap<Integer, Integer> vpnSpnMap;
 
-	private class Pair {
+	private static class Pair {
 		private CoffSection section;
 		private int sectionPageNumber;
 
-		public Pair(CoffSection section, int i) {
+		Pair(CoffSection section, int i) {
 			this.section =section;
 			this.sectionPageNumber = i;
 		}
@@ -474,11 +479,11 @@ public class VMProcess extends UserProcess {
 //			this.readOnly = readOnly;
 //		}
 
-		public CoffSection getSection() {
+		CoffSection getSection() {
 			return this.section;
 		}
 
-		public int getSectionPageNumber() {
+		int getSectionPageNumber() {
 			return this.sectionPageNumber;
 		}
 	}

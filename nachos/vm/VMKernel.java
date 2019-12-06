@@ -29,11 +29,9 @@ public class VMKernel extends UserKernel {
 		pagesAvailableMutex = new Lock();
 		victimLock = new Lock();
 		swapLock = new Lock();
-		victims = new ArrayList<>();
 		swapPages = new LinkedList<>();
 		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
 		spnTotal = 0;
-		// victim = 0;
 
 		// initialize manager
 		manager = new pageManager[Machine.processor().getNumPhysPages()];
@@ -80,7 +78,7 @@ public class VMKernel extends UserKernel {
 //
 //	protected static Lock runningProcessCounterMutex;
 
-	static ArrayList<TranslationEntry> victims;
+	// static ArrayList<TranslationEntry> victims;
 
 	// static int victim;
 
