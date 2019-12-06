@@ -200,7 +200,7 @@ public class VMProcess extends UserProcess {
 	private void fillWithZero(int ppn) {
 		byte[] data = new byte[pageSize];
 		Arrays.fill(data, (byte) 0);
-		//System.arraycopy(data, 0, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
+		System.arraycopy(data, 0, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
 	}
 
 	private int victimFinder() {
