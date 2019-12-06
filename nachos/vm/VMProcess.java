@@ -125,9 +125,7 @@ public class VMProcess extends UserProcess {
 		pageTable[vpn] = translationEntry;
 		// Handle swap in
 		if (dirty) {
-			VMKernel.pagesAvailableMutex.acquire();
 			handleSwapIn(vpn, ppn);
-			VMKernel.pagesAvailableMutex.release();
 		} else {
 			if (section != null) {
 				VMKernel.pagesAvailableMutex.acquire();
