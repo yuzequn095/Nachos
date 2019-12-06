@@ -5,6 +5,9 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
+import javax.swing.*;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 
 /**
@@ -24,6 +27,20 @@ public class VMKernel extends UserKernel {
 	public void initialize(String[] args) {
 		super.initialize(args);
 		pagesAvailableMutex = new Lock();
+		swapLock = new Lock();
+		swapPages = new LinkedList<>();
+		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
+		spnTotal = 0;
+		pinLock = new Lock();
+		numPagesPinned = 0;
+		managerLock = new Lock();
+		pinCV = new Condition(pinLock);
+
+		// initialize manager
+		manager = new pageManager[Machine.processor().getNumPhysPages()];
+		for(int i = 0; i < Machine.processor().getNumPhysPages(); i++){
+			manager[i] = new pageManager(null, null, false);
+		}
 	}
 
 	/**
@@ -63,5 +80,68 @@ public class VMKernel extends UserKernel {
 //	protected static int runningProcessCounter;
 //
 //	protected static Lock runningProcessCounterMutex;
+
+	// static ArrayList<TranslationEntry> victims;
+
+	// static int victim;
+
+	static OpenFile swapFile;
+
+	static int spnTotal;
+
+	static LinkedList<Integer> swapPages;
+
+	static Lock swapLock;
+
+	/**
+	 * Page manager class that keeps the translation entry,
+	 * owner process and pin status for all physical pages in memory.
+	 * Inspired by piazza post
+	 */
+	static class pageManager {
+		private TranslationEntry translationEntry;
+		private VMProcess process;
+		private boolean isPinned;
+
+		public pageManager(TranslationEntry entry, VMProcess process, boolean pin) {
+			translationEntry = entry;
+			process = process;
+			isPinned = pin;
+		}
+
+		public TranslationEntry getEntry() {
+			return this.translationEntry;
+		}
+
+		public void setEntry(TranslationEntry entry) {
+			this.translationEntry = entry;
+		}
+
+		public VMProcess getProcess() {
+			return this.process;
+		}
+
+		public void setProcess(VMProcess process) {
+			this.process = process;
+		}
+
+		public boolean getPinStatus() {
+			return this.isPinned;
+		}
+
+		public void setPinStatus(boolean pin) {
+			this.isPinned = pin;
+		}
+	}
+
+	static pageManager[] manager;
+
+	static Condition pinCV;
+
+	static Lock pinLock;
+
+	static int numPagesPinned;
+
+	static Lock managerLock;
 
 }

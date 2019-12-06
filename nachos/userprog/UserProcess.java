@@ -82,9 +82,15 @@ public class UserProcess {
 	 * @return <tt>true</tt> if the program was successfully executed.
 	 */
 	public boolean execute(String name, String[] args) {
-		if (!load(name, args))
+		if (args.length > 0) {
+			System.out.println("Try to execute filename: " + name + " args: " + args[0]);
+		} else {
+			System.out.println("Try to execute filename: " + name);
+		}
+		if (!load(name, args)) {
+			System.out.println("CAN'T LOAD PROGRAM!");
 			return false;
-
+		}
 		thread = new UThread(this);
 		thread.setName(name).fork();
 		UserKernel.runningProcessCounterMutex.acquire();
@@ -343,6 +349,7 @@ public class UserProcess {
 
 		OpenFile executable = ThreadedKernel.fileSystem.open(name, false);
 		if (executable == null) {
+			System.out.println("\topen failed");
 			Lib.debug(dbgProcess, "\topen failed");
 			return false;
 		}
@@ -352,6 +359,7 @@ public class UserProcess {
 		}
 		catch (EOFException e) {
 			executable.close();
+			System.out.println("coff load failed");
 			Lib.debug(dbgProcess, "\tcoff load failed");
 			return false;
 		}
@@ -362,6 +370,7 @@ public class UserProcess {
 			CoffSection section = coff.getSection(s);
 			if (section.getFirstVPN() != numPages) {
 				coff.close();
+				System.out.println("fragmented executable");
 				Lib.debug(dbgProcess, "\tfragmented executable");
 				return false;
 			}
@@ -378,6 +387,7 @@ public class UserProcess {
 		}
 		if (argsSize > pageSize) {
 			coff.close();
+			System.out.println("arguments too long");
 			Lib.debug(dbgProcess, "\targuments too long");
 			return false;
 		}
@@ -392,8 +402,10 @@ public class UserProcess {
 		// and finally reserve 1 page for arguments
 		numPages++;
 
-		if (!loadSections())
+		if (!loadSections()){
+			System.out.println("Load section failure!");
 			return false;
+		}
 
 		Lib.debug(dbgProcess, "loadsection not false");
 		// store arguments in last page
@@ -430,6 +442,7 @@ public class UserProcess {
 	 * @return <tt>true</tt> if the sections were successfully loaded.
 	 */
 	protected boolean loadSections() {
+		System.out.println("load!");
 		Lib.debug(dbgProcess, "load section starts");
 		if (numPages > Machine.processor().getNumPhysPages() || numPages>UserKernel.pagesAvailable.size()) {
 			coff.close();
@@ -835,9 +848,7 @@ public class UserProcess {
 		//System.out.println(buffer);
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
 		// lock
-//		UserKernel.rwMutex.acquire();
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
-//		UserKernel.rwMutex.release();
 		if (oneTurnWrite < 0) {
 			System.out.println("handleWrite: openFile write method failure.");
 			return -1;
@@ -963,11 +974,12 @@ public class UserProcess {
 				System.out.println("invalid argument from memory, argument is null");
 				return -1;
 			}
+			System.out.println("ith arg: " + cur_arg);
 			args[i] = cur_arg;
 		}
 
 		// create child process
-		UserProcess child = new UserProcess();
+		UserProcess child = new VMProcess();
 		// child is not exited so no exit status
 		children.put(child.pid, child);
 		child.parent = this;
