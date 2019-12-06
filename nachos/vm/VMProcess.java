@@ -360,7 +360,7 @@ public class VMProcess extends UserProcess {
 			// update amount, only updated once
 			amount = Math.min(length - totalRead, pageSize - pageOffset);
 			// actual copy
-//			System.arraycopy(memory, paddr, data, offset, amount);
+			System.arraycopy(memory, paddr, data, offset, amount);
 			// release pin
 //			System.out.println("readVirtualMemory: Releasing pin after reading");
 			releasePin(entry.ppn);
@@ -473,7 +473,7 @@ public class VMProcess extends UserProcess {
 			// update amount, only updated once
 			amount = Math.min(length - totalWrite, pageSize - pageOffset);
 			// actual copy
-//			System.arraycopy(data, offset, memory, paddr, amount);
+			System.arraycopy(data, offset, memory, paddr, amount);
 			// release pin after write
 //			System.out.println("writeVirtualMemory: Releasing pin after writing");
 			releasePin(entry.ppn);
