@@ -76,98 +76,169 @@ public class VMProcess extends UserProcess {
 	 * Case2: stack/heap page, initialize with 0 if clean, load from swap if dirty.
 	 */
 	private void handlePageFault(int badVaddr) {
-		// Case1
-		// Part 1 implemtation
-		int vpnCounter = 0;
-		int badVpn = Processor.pageFromAddress(badVaddr);
-
-		for (int s = 0; s < coff.getNumSections(); s++) {
-			CoffSection section = coff.getSection(s);
-			boolean readOnly = section.isReadOnly();
-
-			for (int i = 0; i < section.getLength(); i++) {
-				int vpn = section.getFirstVPN() + i;
-				System.out.println("VPN: " + vpn);
-				vpnCounter = vpn;
-				// If the page matches the bad vpn
-				if (vpn == badVpn) {
-					int ppn = -1;
-					// Acquire lock for shared data structure
-					VMKernel.pagesAvailableMutex.acquire();
-					// Check if there's no free physical pages
-					if (UserKernel.pagesAvailable.isEmpty()) {
-						System.out.println("Run out of physical memory without swap vpn: " + vpn);
-						// TODO evict page
-						ppn = evictPage();
-						if (ppn < 0) {
-							System.out.println("Evict unsuccessful!");
-							VMKernel.pagesAvailableMutex.release();
-							return;
-						}
-					} else {
-						// Allocate new physical page
-						ppn = UserKernel.pagesAvailable.remove();
-
-					}
-					VMKernel.pagesAvailableMutex.release();
-					// Initialize translationEntry
-					boolean dirty = pageTable[vpn].dirty;
-					System.out.println("Newly assigned ppn: " + ppn);
-					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, true, dirty);
-					pageTable[vpn] = translationEntry;
-					// Handle swap in
-					if (dirty) {
-						handleSwapIn(vpn, ppn);
-					} else {
-						section.loadPage(i, ppn);
-					}
-					if (readOnly) {
-						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
-					}
-					VMKernel.manager[ppn].setEntry(translationEntry);
-					return;
-				}
-			}
+		int vpn = Processor.pageFromAddress(badVaddr);
+		Pair pair = sectionFinder(badVaddr);
+		CoffSection section = pair.getSection();
+		int sectionPageNumber = pair.getSectionPageNumber();
+		boolean readOnly;
+		if (section == null) {
+			readOnly = false;
+		} else {
+			readOnly = section.isReadOnly();
 		}
-
-		// Case 2
-		// Part 1 implemtation
-		for (int vpn = vpnCounter + 1; vpn < numPages; vpn++) {
-			// If the page matches the bad vpn
-			if (vpn == badVpn) {
-				int ppn = -1;
-				// Acquire lock for shared data structure
-				VMKernel.pagesAvailableMutex.acquire();
-				// Check if there's no free physical pages
-				if (UserKernel.pagesAvailable.isEmpty()) {
-					System.out.println("Run out of physical memory without swap vpn: " + vpn);
-					// TODO evict page
-					ppn = evictPage();
-					if (ppn < 0) {
-						System.out.println("Evict unsuccessful!");
-						VMKernel.pagesAvailableMutex.release();
-						return;
-					}
-				} else {
-					ppn = UserKernel.pagesAvailable.remove();
-				}
+		int ppn = -1;
+		// Acquire lock for shared data structure
+		VMKernel.pagesAvailableMutex.acquire();
+		// Check if there's no free physical pages
+		if (UserKernel.pagesAvailable.isEmpty()) {
+			System.out.println("Run out of physical memory without swap vpn: " + vpn);
+			// TODO evict page
+			ppn = evictPage();
+			if (ppn < 0) {
+				System.out.println("Evict unsuccessful!");
 				VMKernel.pagesAvailableMutex.release();
-				// Initialize translationEntry
-				boolean dirty = pageTable[vpn].dirty;
-				System.out.println("Newly assigned ppn: " + ppn);
-				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, true, dirty);
-				pageTable[vpn] = translationEntry;
-				// Handle swap in
-				if (translationEntry.dirty) {
-					handleSwapIn(vpn, ppn);
-				} else {
-					// Fill the physical memory with 0
-					fillWithZero(ppn);
-				}
-				VMKernel.manager[ppn].setEntry(translationEntry);
 				return;
 			}
+		} else {
+			// Allocate new physical page
+			ppn = UserKernel.pagesAvailable.remove();
+
 		}
+		VMKernel.pagesAvailableMutex.release();
+		// Initialize translationEntry
+		boolean dirty = pageTable[vpn].dirty;
+		System.out.println("Newly assigned ppn: " + ppn);
+		TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, true, dirty);
+		pageTable[vpn] = translationEntry;
+		// Handle swap in
+		if (dirty) {
+			handleSwapIn(vpn, ppn);
+		} else {
+			if (section != null) {
+				section.loadPage(sectionPageNumber, ppn);
+			} else {
+				fillWithZero(ppn);
+			}
+		}
+		if (readOnly) {
+			System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
+		}
+		VMKernel.manager[ppn].setEntry(translationEntry);
+//		for (int s = 0; s < coff.getNumSections(); s++) {
+//			CoffSection section = coff.getSection(s);
+//			boolean readOnly = section.isReadOnly();
+//
+//			for (int i = 0; i < section.getLength(); i++) {
+//				int vpn = section.getFirstVPN() + i;
+//				System.out.println("VPN: " + vpn);
+//				vpnCounter = vpn;
+//				// If the page matches the bad vpn
+//				if (vpn == badVpn) {
+//					int ppn = -1;
+//					// Acquire lock for shared data structure
+//					VMKernel.pagesAvailableMutex.acquire();
+//					// Check if there's no free physical pages
+//					if (UserKernel.pagesAvailable.isEmpty()) {
+//						System.out.println("Run out of physical memory without swap vpn: " + vpn);
+//						// TODO evict page
+//						ppn = evictPage();
+//						if (ppn < 0) {
+//							System.out.println("Evict unsuccessful!");
+//							VMKernel.pagesAvailableMutex.release();
+//							return;
+//						}
+//					} else {
+//						// Allocate new physical page
+//						ppn = UserKernel.pagesAvailable.remove();
+//
+//					}
+//					VMKernel.pagesAvailableMutex.release();
+//					// Initialize translationEntry
+//					boolean dirty = pageTable[vpn].dirty;
+//					System.out.println("Newly assigned ppn: " + ppn);
+//					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, true, dirty);
+//					pageTable[vpn] = translationEntry;
+//					// Handle swap in
+//					if (dirty) {
+//						handleSwapIn(vpn, ppn);
+//					} else {
+//						section.loadPage(i, ppn);
+//					}
+//					if (readOnly) {
+//						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
+//					}
+//					VMKernel.manager[ppn].setEntry(translationEntry);
+//					return;
+//				}
+//			}
+//		}
+//
+//		// Case 2
+//		// Part 1 implemtation
+//		for (int vpn = vpnCounter + 1; vpn < numPages; vpn++) {
+//			// If the page matches the bad vpn
+//			if (vpn == badVpn) {
+//				int ppn = -1;
+//				// Acquire lock for shared data structure
+//				VMKernel.pagesAvailableMutex.acquire();
+//				// Check if there's no free physical pages
+//				if (UserKernel.pagesAvailable.isEmpty()) {
+//					System.out.println("Run out of physical memory without swap vpn: " + vpn);
+//					// TODO evict page
+//					ppn = evictPage();
+//					if (ppn < 0) {
+//						System.out.println("Evict unsuccessful!");
+//						VMKernel.pagesAvailableMutex.release();
+//						return;
+//					}
+//				} else {
+//					ppn = UserKernel.pagesAvailable.remove();
+//				}
+//				VMKernel.pagesAvailableMutex.release();
+//				// Initialize translationEntry
+//				boolean dirty = pageTable[vpn].dirty;
+//				System.out.println("Newly assigned ppn: " + ppn);
+//				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, true, dirty);
+//				pageTable[vpn] = translationEntry;
+//				// Handle swap in
+//				if (translationEntry.dirty) {
+//					handleSwapIn(vpn, ppn);
+//				} else {
+//					// Fill the physical memory with 0
+//					fillWithZero(ppn);
+//				}
+//				VMKernel.manager[ppn].setEntry(translationEntry);
+//				return;
+//			}
+//		}
+	}
+
+	private Pair sectionFinder(int badVaddr) {
+		int vpnCounter = 0;
+		// Case1
+		int badVpn = Processor.pageFromAddress(badVaddr);
+		for (int s = 0; s < coff.getNumSections(); s++) {
+			CoffSection section = coff.getSection(s);
+			for (int i = 0; i < section.getLength(); i++) {
+				int vpn = section.getFirstVPN() + i;
+				System.out.println("sectionFinder: Looking for bad vpn, vpn: " + vpn);
+				vpnCounter = vpn;
+
+				// found bad vpn
+				if (vpn == badVpn) {
+					System.out.println("sectionFinder: Found bad vpn in section, vpn: " + vpn + "section page number: " + i);
+					return new Pair(section, i);
+				}
+			}
+		}
+		// Case2
+		for (int vpn = vpnCounter + 1; vpn < numPages; vpn++) {
+			if (vpn == badVpn) {
+				System.out.println("sectionFinder: Found for bad vpn in other pages: " + vpn);
+				return new Pair(null, -1);
+			}
+		}
+		return new Pair(null, -1);
 	}
 
 	private void handleSwapIn(int vpn, int ppn) {
@@ -480,4 +551,30 @@ public class VMProcess extends UserProcess {
 	private static final char dbgVM = 'v';
 
 	private static HashMap<Integer, Integer> vpnSpnMap;
+
+	private class Pair {
+		private CoffSection section;
+		private int sectionPageNumber;
+
+		public Pair(CoffSection section, int i) {
+			this.section =section;
+			this.sectionPageNumber = i;
+		}
+
+//		public void setPPN(int ppn) {
+//			this.ppn = ppn;
+//		}
+//
+//		public void setReadOnly(boolean readOnly) {
+//			this.readOnly = readOnly;
+//		}
+
+		public CoffSection getSection() {
+			return this.section;
+		}
+
+		public int getSectionPageNumber() {
+			return this.sectionPageNumber;
+		}
+	}
 }
