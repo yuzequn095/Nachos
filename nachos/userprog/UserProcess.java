@@ -349,6 +349,7 @@ public class UserProcess {
 
 		OpenFile executable = ThreadedKernel.fileSystem.open(name, false);
 		if (executable == null) {
+			System.out.println("\topen failed");
 			Lib.debug(dbgProcess, "\topen failed");
 			return false;
 		}
@@ -358,6 +359,7 @@ public class UserProcess {
 		}
 		catch (EOFException e) {
 			executable.close();
+			System.out.println("\tcoff load failed");
 			Lib.debug(dbgProcess, "\tcoff load failed");
 			return false;
 		}
@@ -368,6 +370,7 @@ public class UserProcess {
 			CoffSection section = coff.getSection(s);
 			if (section.getFirstVPN() != numPages) {
 				coff.close();
+				System.out.println("\tfragmented executable");
 				Lib.debug(dbgProcess, "\tfragmented executable");
 				return false;
 			}
@@ -384,6 +387,7 @@ public class UserProcess {
 		}
 		if (argsSize > pageSize) {
 			coff.close();
+			System.out.println("\targuments too long");
 			Lib.debug(dbgProcess, "\targuments too long");
 			return false;
 		}
