@@ -240,7 +240,6 @@ public class VMProcess extends UserProcess {
 	 * @return the ppn of the evicted page for resuse
 	 */
 	private int evictPage() {
-		VMKernel.managerLock.acquire();
 		System.out.println("Starting evict page!");
 		int vpn;
 		// pick a page to evict
@@ -260,7 +259,6 @@ public class VMProcess extends UserProcess {
 		}
 		// processing complete, exit loop
 		System.out.println("Eviction successful!");
-		VMKernel.managerLock.release();
 		return ppn;
 	}
 
