@@ -337,10 +337,11 @@ public class VMProcess extends UserProcess {
 				System.out.println("readVirtualMemory: Setting pin for updated ppn");
 				setPin(entry.ppn);
 				System.out.println("readVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+			} else {
+				// set pin for initial ppn
+				System.out.println("readVirtualMemory: Setting pin for initial ppn");
+				setPin(entry.ppn);
 			}
-			// set pin for initial ppn
-			System.out.println("readVirtualMemory: Setting pin for initial ppn");
-			setPin(entry.ppn);
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
 				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
@@ -439,10 +440,11 @@ public class VMProcess extends UserProcess {
 				System.out.println("writeVirtualMemory: Setting pin for updated ppn");
 				setPin(entry.ppn);
 				System.out.println("writeVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+			} else {
+				// set pin for initial ppn
+				System.out.println("writeVirtualMemory: Setting pin for initial ppn");
+				setPin(entry.ppn);
 			}
-			// set pin for initial ppn
-			System.out.println("writeVirtualMemory: Setting pin for initial ppn");
-			setPin(entry.ppn);
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
 				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
