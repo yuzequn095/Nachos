@@ -124,9 +124,7 @@ public class VMProcess extends UserProcess {
 			if (section != null) {
 				section.loadPage(sectionPageNumber, ppn);
 			} else {
-				VMKernel.managerLock.acquire();
 				fillWithZero(ppn);
-				VMKernel.managerLock.release();
 			}
 		}
 		if (readOnly) {
