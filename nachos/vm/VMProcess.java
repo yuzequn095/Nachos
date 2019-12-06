@@ -77,6 +77,7 @@ public class VMProcess extends UserProcess {
 	 */
 	private void handlePageFault(int badVaddr) {
 		int vpn = Processor.pageFromAddress(badVaddr);
+		// Find the corresponding coff section from badvaddr
 		Pair pair = sectionFinder(badVaddr);
 		CoffSection section = pair.getSection();
 		int sectionPageNumber = pair.getSectionPageNumber();
@@ -124,93 +125,6 @@ public class VMProcess extends UserProcess {
 			System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 		}
 		VMKernel.manager[ppn].setEntry(translationEntry);
-//		for (int s = 0; s < coff.getNumSections(); s++) {
-//			CoffSection section = coff.getSection(s);
-//			boolean readOnly = section.isReadOnly();
-//
-//			for (int i = 0; i < section.getLength(); i++) {
-//				int vpn = section.getFirstVPN() + i;
-//				System.out.println("VPN: " + vpn);
-//				vpnCounter = vpn;
-//				// If the page matches the bad vpn
-//				if (vpn == badVpn) {
-//					int ppn = -1;
-//					// Acquire lock for shared data structure
-//					VMKernel.pagesAvailableMutex.acquire();
-//					// Check if there's no free physical pages
-//					if (UserKernel.pagesAvailable.isEmpty()) {
-//						System.out.println("Run out of physical memory without swap vpn: " + vpn);
-//						// TODO evict page
-//						ppn = evictPage();
-//						if (ppn < 0) {
-//							System.out.println("Evict unsuccessful!");
-//							VMKernel.pagesAvailableMutex.release();
-//							return;
-//						}
-//					} else {
-//						// Allocate new physical page
-//						ppn = UserKernel.pagesAvailable.remove();
-//
-//					}
-//					VMKernel.pagesAvailableMutex.release();
-//					// Initialize translationEntry
-//					boolean dirty = pageTable[vpn].dirty;
-//					System.out.println("Newly assigned ppn: " + ppn);
-//					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, true, dirty);
-//					pageTable[vpn] = translationEntry;
-//					// Handle swap in
-//					if (dirty) {
-//						handleSwapIn(vpn, ppn);
-//					} else {
-//						section.loadPage(i, ppn);
-//					}
-//					if (readOnly) {
-//						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
-//					}
-//					VMKernel.manager[ppn].setEntry(translationEntry);
-//					return;
-//				}
-//			}
-//		}
-//
-//		// Case 2
-//		// Part 1 implemtation
-//		for (int vpn = vpnCounter + 1; vpn < numPages; vpn++) {
-//			// If the page matches the bad vpn
-//			if (vpn == badVpn) {
-//				int ppn = -1;
-//				// Acquire lock for shared data structure
-//				VMKernel.pagesAvailableMutex.acquire();
-//				// Check if there's no free physical pages
-//				if (UserKernel.pagesAvailable.isEmpty()) {
-//					System.out.println("Run out of physical memory without swap vpn: " + vpn);
-//					// TODO evict page
-//					ppn = evictPage();
-//					if (ppn < 0) {
-//						System.out.println("Evict unsuccessful!");
-//						VMKernel.pagesAvailableMutex.release();
-//						return;
-//					}
-//				} else {
-//					ppn = UserKernel.pagesAvailable.remove();
-//				}
-//				VMKernel.pagesAvailableMutex.release();
-//				// Initialize translationEntry
-//				boolean dirty = pageTable[vpn].dirty;
-//				System.out.println("Newly assigned ppn: " + ppn);
-//				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, true, dirty);
-//				pageTable[vpn] = translationEntry;
-//				// Handle swap in
-//				if (translationEntry.dirty) {
-//					handleSwapIn(vpn, ppn);
-//				} else {
-//					// Fill the physical memory with 0
-//					fillWithZero(ppn);
-//				}
-//				VMKernel.manager[ppn].setEntry(translationEntry);
-//				return;
-//			}
-//		}
 	}
 
 	private Pair sectionFinder(int badVaddr) {
@@ -389,9 +303,6 @@ public class VMProcess extends UserProcess {
 				// update paddr
 				entry = pageTable[entry.vpn];
 				paddr = entry.ppn * pageSize + pageOffset;
-				if (!entry.valid) {
-					return totalRead;
-				}
 				System.out.println("readVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 			}
 			// check paddr
@@ -403,8 +314,6 @@ public class VMProcess extends UserProcess {
 			amount = Math.min(length - totalRead, pageSize - pageOffset);
 			// actual copy
 			System.arraycopy(memory, paddr, data, offset, amount);
-			// update used bit (Proj3 part 2)
-			entry.used = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
@@ -484,9 +393,6 @@ public class VMProcess extends UserProcess {
 				// update paddr
 				entry = pageTable[entry.vpn];
 				paddr = entry.ppn * pageSize + pageOffset;
-				if (!entry.valid) {
-					return totalWrite;
-				}
 				System.out.println("writeVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 			}
 			// check paddr
@@ -504,7 +410,6 @@ public class VMProcess extends UserProcess {
 			// actual copy
 			System.arraycopy(data, offset, memory, paddr, amount);
 			// update used bit (Proj3 part2)
-			entry.used = true;
 			entry.dirty = true;
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
