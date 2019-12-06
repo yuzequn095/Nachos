@@ -104,7 +104,6 @@ public class VMProcess extends UserProcess {
 			if (ppn < 0) {
 				System.out.println("Evict unsuccessful!");
 				VMKernel.pagesAvailableMutex.release();
-				VMKernel.managerLock.release();
 				return;
 			}
 		} else {
@@ -137,7 +136,6 @@ public class VMProcess extends UserProcess {
 		}
 		VMKernel.manager[ppn].setEntry(translationEntry);
 		VMKernel.manager[ppn].setProcess(this);
-		VMKernel.managerLock.release();
 	}
 
 	private Pair sectionFinder(int badVaddr) {
