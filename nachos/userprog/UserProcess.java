@@ -745,7 +745,9 @@ public class UserProcess {
 				return -1;
 			}
 			// Write
+			UserKernel.rwLock.acquire();
 			int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
+			UserKernel.rwLock.release();
 			if (oneTurnRead < oneTurnWrite) {
 				System.out.println("handleRead: write onto VM failure.");
 				return -1;
@@ -765,7 +767,9 @@ public class UserProcess {
 			System.out.println("handleRead: openFile read method failure.");
 			return -1;
 		}
+		UserKernel.rwLock.acquire();
 		int oneTurnWrite = writeVirtualMemory(buffer,pageSizeArray,0,oneTurnRead);
+		UserKernel.rwLock.release();
 		if (oneTurnRead < oneTurnWrite) {
 			System.out.println("handleRead: write onto VM failure.");
 			return -1;
@@ -815,7 +819,9 @@ public class UserProcess {
 		byte[] pageSizeArray = new byte[pageSize];
 		int writeCount = 0;
 		while (count > pageSize) {
+			UserKernel.rwLock.acquire();
 			int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+			UserKernel.rwLock.release();
 			// System.out.println("One turn read: " + oneTurnRead);
 			int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);
 			// should check this case first to make sure we read enough 
@@ -846,7 +852,9 @@ public class UserProcess {
 		pageSizeArray = new byte[count];
 		//System.out.println("Start reading rest things buffer: "+buffer+" pageSize: " + pageSizeArray.length);
 		//System.out.println(buffer);
+		UserKernel.rwLock.acquire();
 		int oneTurnRead = readVirtualMemory(buffer,pageSizeArray);
+		UserKernel.rwLock.release();
 		// lock
 //		UserKernel.rwMutex.acquire();
 		int oneTurnWrite = openFile.write(pageSizeArray,0,oneTurnRead);

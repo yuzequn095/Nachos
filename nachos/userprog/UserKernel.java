@@ -36,6 +36,7 @@ public class UserKernel extends ThreadedKernel {
 //		rwMutex = new Lock();
 		pidCounter = 0;
 		runningProcessCounter = 0;
+		rwLock = new Lock();
 	}
 
 	private void getAvailablePages() {
@@ -149,6 +150,8 @@ public class UserKernel extends ThreadedKernel {
 	protected static int runningProcessCounter;
 
 	protected static Lock runningProcessCounterMutex;
+
+	protected static Lock rwLock;
 
 //	protected static Lock rwMutex;
 }
