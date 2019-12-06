@@ -202,7 +202,14 @@ public class VMProcess extends UserProcess {
 		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++) {
 			System.out.println("Iterating victim ppn: " + i + "...");
 			// TODO check if the page is pinned
-			if (false) {
+			if (VMKernel.manager[i].getPinStatus()) {
+				System.out.println("Page pinned! ppn: " + i);
+				// check if all pages are pinned
+				if (VMKernel.numPagesPinned == numPages) {
+					System.out.println("All pages are pinned, process" + pid + " sleep on CV!");
+					// make the process sleep on CV
+					VMKernel.pinCV.sleep();
+				}
 				continue;
 			}
 			TranslationEntry entry = VMKernel.manager[i].getEntry();
@@ -224,7 +231,6 @@ public class VMProcess extends UserProcess {
 	 * @return the ppn of the evicted page for resuse
 	 */
 	private int evictPage() {
-		// TODO check if all pages are pinned
 		System.out.println("Starting evict page!");
 		int vpn;
 		// pick a page to evict
@@ -236,10 +242,6 @@ public class VMProcess extends UserProcess {
 		tempEntry.valid = false;
 		Lib.assertTrue(tempEntry.valid == VMKernel.manager[ppn].getEntry().valid);
 		System.out.println("Target victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
-		// acquire lock for modifying shared data structure
-		VMKernel.victimLock.acquire();
-		VMKernel.victimLock.release();
-
 		// start to evict the page
 		// check of page is dirty
 		if (tempEntry.dirty) {
@@ -250,6 +252,23 @@ public class VMProcess extends UserProcess {
 		System.out.println("Eviction successful!");
 
 		return ppn;
+	}
+
+	private void setPin(int ppn) {
+		VMKernel.pinLock.acquire();
+		VMKernel.manager[ppn].setPinStatus(true);
+		VMKernel.numPagesPinned++;
+		VMKernel.pinLock.release();
+		System.out.println("Set pin done on ppn: " + ppn + " by process " + VMKernel.manager[ppn].getProcess().pid);
+	}
+
+	private void releasePin(int ppn) {
+		VMKernel.pinLock.acquire();
+		VMKernel.manager[ppn].setPinStatus(false);
+		VMKernel.numPagesPinned--;
+		VMKernel.pinCV.wake();
+		VMKernel.pinLock.release();
+		System.out.println("Release pin done on ppn: " + ppn + " by process " + VMKernel.manager[ppn].getProcess().pid);
 	}
 
 	/**
@@ -313,17 +332,29 @@ public class VMProcess extends UserProcess {
 				// update paddr
 				entry = pageTable[entry.vpn];
 				paddr = entry.ppn * pageSize + pageOffset;
+				// set pin for updated ppn
+				System.out.println("readVirtualMemory: Setting pin for updated ppn");
+				setPin(entry.ppn);
 				System.out.println("readVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 			}
+			// set pin for initial ppn
+			System.out.println("readVirtualMemory: Setting pin for initial ppn");
+			setPin(entry.ppn);
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
 				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				// release pin when error occur
+				System.out.println("readVirtualMemory: Releasing pin because invalid paddr");
+				releasePin(entry.ppn);
 				return totalRead;
 			}
 			// update amount, only updated once
 			amount = Math.min(length - totalRead, pageSize - pageOffset);
 			// actual copy
 			System.arraycopy(memory, paddr, data, offset, amount);
+			// release pin
+			System.out.println("readVirtualMemory: Releasing pin after reading");
+			releasePin(entry.ppn);
 			// update vaddr->entry->pageOffset->paddr
 			vaddr += amount;
 			int curVPN = Processor.pageFromAddress(vaddr);
@@ -403,22 +434,37 @@ public class VMProcess extends UserProcess {
 				// update paddr
 				entry = pageTable[entry.vpn];
 				paddr = entry.ppn * pageSize + pageOffset;
+				// set pin for updated ppn
+				System.out.println("writeVirtualMemory: Setting pin for updated ppn");
+				setPin(entry.ppn);
 				System.out.println("writeVirtualMemory: After handlePageFault vpn: "+ entry.vpn + "ppn: " + entry.ppn);
 			}
+			// set pin for initial ppn
+			System.out.println("writeVirtualMemory: Setting pin for initial ppn");
+			setPin(entry.ppn);
 			// check paddr
 			if (paddr < 0 || paddr >= memory.length) {
 				System.out.println("physical address out of bound! vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				// release pin when error occur
+				System.out.println("writeVirtualMemory: Releasing pin because invalid paddr");
+				releasePin(entry.ppn);
 				return totalWrite;
 			}
 			// check if the page is read_only
 			if (entry.readOnly) {
-				System.out.println("Read-Only page, vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				System.out.println("writeVirtualMemory: Read-Only page, vpn: "+ entry.vpn + " ppn: " + entry.ppn + " ,aborting!");
+				// release pin when error occur
+				System.out.println("writeVirtualMemory: Releasing pin because page is read only");
+				releasePin(entry.ppn);
 				return totalWrite;
 			}
 			// update amount, only updated once
 			amount = Math.min(length - totalWrite, pageSize - pageOffset);
 			// actual copy
 			System.arraycopy(data, offset, memory, paddr, amount);
+			// release pin after write
+			System.out.println("writeVirtualMemory: Releasing pin after writing");
+			releasePin(entry.ppn);
 			// update used bit (Proj3 part2)
 			entry.dirty = true;
 			// update vaddr->entry->pageOffset->paddr

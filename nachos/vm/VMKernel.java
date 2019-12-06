@@ -27,11 +27,14 @@ public class VMKernel extends UserKernel {
 	public void initialize(String[] args) {
 		super.initialize(args);
 		pagesAvailableMutex = new Lock();
-		victimLock = new Lock();
 		swapLock = new Lock();
 		swapPages = new LinkedList<>();
 		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
 		spnTotal = 0;
+		pinLock = new Lock();
+		pinCV = new Condition(pinLock);
+		numPagesPinned = 0;
+
 
 		// initialize manager
 		manager = new pageManager[Machine.processor().getNumPhysPages()];
@@ -81,8 +84,6 @@ public class VMKernel extends UserKernel {
 	// static ArrayList<TranslationEntry> victims;
 
 	// static int victim;
-
-	static Lock victimLock;
 
 	static OpenFile swapFile;
 
@@ -134,5 +135,11 @@ public class VMKernel extends UserKernel {
 	}
 
 	static pageManager[] manager;
+
+	static Condition pinCV;
+
+	static Lock pinLock;
+
+	static int numPagesPinned;
 
 }
