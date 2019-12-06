@@ -508,6 +508,7 @@ public class VMProcess extends UserProcess {
 
 		switch (cause) {
 		case Processor.exceptionPageFault:
+			System.out.println("Process" + pid + " call handlePageFault from handleException");
 			handlePageFault(processor.readRegister(Processor.regBadVAddr));
 			break;
 		default:
