@@ -359,7 +359,7 @@ public class UserProcess {
 		}
 		catch (EOFException e) {
 			executable.close();
-			System.out.println("\tcoff load failed");
+			System.out.println("coff load failed");
 			Lib.debug(dbgProcess, "\tcoff load failed");
 			return false;
 		}
@@ -370,7 +370,7 @@ public class UserProcess {
 			CoffSection section = coff.getSection(s);
 			if (section.getFirstVPN() != numPages) {
 				coff.close();
-				System.out.println("\tfragmented executable");
+				System.out.println("fragmented executable");
 				Lib.debug(dbgProcess, "\tfragmented executable");
 				return false;
 			}
@@ -387,7 +387,7 @@ public class UserProcess {
 		}
 		if (argsSize > pageSize) {
 			coff.close();
-			System.out.println("\targuments too long");
+			System.out.println("arguments too long");
 			Lib.debug(dbgProcess, "\targuments too long");
 			return false;
 		}
@@ -402,8 +402,10 @@ public class UserProcess {
 		// and finally reserve 1 page for arguments
 		numPages++;
 
-		if (!loadSections())
+		if (!loadSections()){
+			System.out.println("Load section failure!");
 			return false;
+		}
 
 		Lib.debug(dbgProcess, "loadsection not false");
 		// store arguments in last page
