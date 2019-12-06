@@ -7,7 +7,6 @@ import nachos.vm.*;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.NoSuchElementException;
 
 /**
  * A <tt>UserProcess</tt> that supports demand-paging.
@@ -125,6 +124,7 @@ public class VMProcess extends UserProcess {
 			System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 		}
 		VMKernel.manager[ppn].setEntry(translationEntry);
+		VMKernel.manager[ppn].setProcess(this);
 	}
 
 	private Pair sectionFinder(int badVaddr) {
@@ -158,7 +158,12 @@ public class VMProcess extends UserProcess {
 	private void handleSwapIn(int vpn, int ppn) {
 		System.out.println("Swapping in! target's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
 		VMKernel.swapLock.acquire();
-		int spn = vpnSpnMap.get(vpn);
+		int spn = -1;
+		if (vpnSpnMap.containsKey(vpn)) {
+			spn = vpnSpnMap.get(vpn);
+		} else {
+			System.out.println("handleSwapIn: SPN table does not contain this vpn! Check for concurrency issue!");
+		}
 		VMKernel.swapFile.read( spn* pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
 		VMKernel.swapPages.add(spn);
 		VMKernel.swapLock.release();
@@ -180,8 +185,8 @@ public class VMProcess extends UserProcess {
 		System.out.println("handleSwapOut: spn [" + spn + "]");
 		// swap out page
 		VMKernel.swapFile.write(spn * pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
-		// update map
-		vpnSpnMap.put(vpn, spn);
+		// update map of the corresponding process
+		VMKernel.manager[ppn].getProcess().vpnSpnMap.put(vpn, spn);
 		VMKernel.swapLock.release();
 	}
 
@@ -460,7 +465,7 @@ public class VMProcess extends UserProcess {
 
 	private static final char dbgVM = 'v';
 
-	private static HashMap<Integer, Integer> vpnSpnMap;
+	private HashMap<Integer, Integer> vpnSpnMap;
 
 	private static class Pair {
 		private CoffSection section;
