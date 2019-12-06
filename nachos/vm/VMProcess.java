@@ -476,14 +476,6 @@ public class VMProcess extends UserProcess {
 			this.sectionPageNumber = i;
 		}
 
-//		public void setPPN(int ppn) {
-//			this.ppn = ppn;
-//		}
-//
-//		public void setReadOnly(boolean readOnly) {
-//			this.readOnly = readOnly;
-//		}
-
 		CoffSection getSection() {
 			return this.section;
 		}

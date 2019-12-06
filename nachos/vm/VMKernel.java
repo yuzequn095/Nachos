@@ -92,6 +92,11 @@ public class VMKernel extends UserKernel {
 
 	static Lock swapLock;
 
+	/**
+	 * Page manager class that keeps the translation entry,
+	 * owner process and pin status for all physical pages in memory.
+	 * Inspired by piazza post
+	 */
 	static class pageManager {
 		private TranslationEntry translationEntry;
 		private VMProcess process;
