@@ -170,6 +170,7 @@ public class VMProcess extends UserProcess {
 		}
 		VMKernel.swapFile.read( spn* pageSize, Machine.processor().getMemory(), Processor.makeAddress(ppn, 0), pageSize);
 		VMKernel.swapPages.add(spn);
+		vpnSpnMap.remove(vpn);
 		VMKernel.swapLock.release();
 	}
 
