@@ -43,6 +43,7 @@ public class VMProcess extends UserProcess {
 	 * @return <tt>true</tt> if successful.
 	 */
 	protected boolean loadSections() {
+		System.out.println("load2!!");
 		// initialize page table
 		pageTable = new TranslationEntry[numPages];
 		/**No mutex needed for part 2**/

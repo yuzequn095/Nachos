@@ -981,7 +981,7 @@ public class UserProcess {
 		}
 
 		// create child process
-		UserProcess child = new UserProcess();
+		UserProcess child = new VMProcess();
 		// child is not exited so no exit status
 		children.put(child.pid, child);
 		child.parent = this;
