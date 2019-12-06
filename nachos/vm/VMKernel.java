@@ -31,8 +31,8 @@ public class VMKernel extends UserKernel {
 		swapPages = new LinkedList<>();
 		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
 		spnTotal = 0;
-		pinLock = new Lock();
-		pinCV = new Condition(pinLock);
+		// pinLock = new Lock();
+		pinCV = new Condition(rwLock);
 		numPagesPinned = 0;
 		managerLock = new Lock();
 		rwLock = new Lock();
@@ -140,7 +140,7 @@ public class VMKernel extends UserKernel {
 
 	static Condition pinCV;
 
-	static Lock pinLock;
+	// static Lock pinLock;
 
 	static int numPagesPinned;
 

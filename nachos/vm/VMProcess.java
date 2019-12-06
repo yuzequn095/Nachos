@@ -265,19 +265,19 @@ public class VMProcess extends UserProcess {
 	}
 
 	private void setPin(int ppn) {
-		VMKernel.pinLock.acquire();
+		// VMKernel.pinLock.acquire();
 		VMKernel.manager[ppn].setPinStatus(true);
 		VMKernel.numPagesPinned++;
-		VMKernel.pinLock.release();
+		// VMKernel.pinLock.release();
 		System.out.println("Set pin done on ppn: " + ppn + " by process " + VMKernel.manager[ppn].getProcess().pid);
 	}
 
 	private void releasePin(int ppn) {
-		VMKernel.pinLock.acquire();
+		// VMKernel.pinLock.acquire();
 		VMKernel.manager[ppn].setPinStatus(false);
 		VMKernel.numPagesPinned--;
 		VMKernel.pinCV.wake();
-		VMKernel.pinLock.release();
+		// VMKernel.pinLock.release();
 		System.out.println("Release pin done on ppn: " + ppn + " by process " + VMKernel.manager[ppn].getProcess().pid);
 	}
 
