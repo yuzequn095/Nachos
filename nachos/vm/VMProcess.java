@@ -109,7 +109,7 @@ public class VMProcess extends UserProcess {
 		}
 		VMKernel.pagesAvailableMutex.release();
 		// Initialize translationEntry
-		vpn = Processor.pageFromAddress(badVaddr);
+//		vpn = Processor.pageFromAddress(badVaddr);
 		System.out.println("Vpn before dirty: " + vpn);
 		boolean dirty = pageTable[vpn].dirty;
 		System.out.println("Newly assigned ppn: " + ppn);
@@ -128,8 +128,10 @@ public class VMProcess extends UserProcess {
 		if (readOnly) {
 			System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 		}
+		VMKernel.managerLock.acquire();
 		VMKernel.manager[ppn].setEntry(translationEntry);
 		VMKernel.manager[ppn].setProcess(this);
+		VMKernel.managerLock.release();
 	}
 
 	private Pair sectionFinder(int badVaddr) {
@@ -237,6 +239,7 @@ public class VMProcess extends UserProcess {
 	 * @return the ppn of the evicted page for resuse
 	 */
 	private int evictPage() {
+		VMKernel.managerLock.acquire();
 		System.out.println("Starting evict page!");
 		int vpn;
 		// pick a page to evict
@@ -256,7 +259,7 @@ public class VMProcess extends UserProcess {
 		}
 		// processing complete, exit loop
 		System.out.println("Eviction successful!");
-
+		VMKernel.managerLock.release();
 		return ppn;
 	}
 

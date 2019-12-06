@@ -34,6 +34,7 @@ public class VMKernel extends UserKernel {
 		pinLock = new Lock();
 		pinCV = new Condition(pinLock);
 		numPagesPinned = 0;
+		managerLock = new Lock();
 
 
 		// initialize manager
@@ -141,5 +142,7 @@ public class VMKernel extends UserKernel {
 	static Lock pinLock;
 
 	static int numPagesPinned;
+
+	static Lock managerLock;
 
 }
