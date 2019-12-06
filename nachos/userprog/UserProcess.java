@@ -442,6 +442,7 @@ public class UserProcess {
 	 * @return <tt>true</tt> if the sections were successfully loaded.
 	 */
 	protected boolean loadSections() {
+		System.out.println("load!");
 		Lib.debug(dbgProcess, "load section starts");
 		if (numPages > Machine.processor().getNumPhysPages() || numPages>UserKernel.pagesAvailable.size()) {
 			coff.close();
