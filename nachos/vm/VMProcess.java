@@ -76,6 +76,7 @@ public class VMProcess extends UserProcess {
 	 * Case2: stack/heap page, initialize with 0 if clean, load from swap if dirty.
 	 */
 	private void handlePageFault(int badVaddr) {
+		VMKernel.managerLock.acquire();
 		System.out.println("Process " + pid + " start to handle page fault!");
 		int vpn = Processor.pageFromAddress(badVaddr);
 		System.out.println("Vpn at start of handlePageFault: " + vpn);
@@ -100,6 +101,7 @@ public class VMProcess extends UserProcess {
 			if (ppn < 0) {
 				System.out.println("Evict unsuccessful!");
 				VMKernel.pagesAvailableMutex.release();
+				VMKernel.managerLock.release();
 				return;
 			}
 		} else {
@@ -128,7 +130,6 @@ public class VMProcess extends UserProcess {
 		if (readOnly) {
 			System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 		}
-		VMKernel.managerLock.acquire();
 		VMKernel.manager[ppn].setEntry(translationEntry);
 		VMKernel.manager[ppn].setProcess(this);
 		VMKernel.managerLock.release();
