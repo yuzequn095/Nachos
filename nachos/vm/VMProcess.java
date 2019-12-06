@@ -97,7 +97,6 @@ public class VMProcess extends UserProcess {
 		if (UserKernel.pagesAvailable.isEmpty()) {
 			System.out.println("Run out of physical memory without swap vpn: " + vpn);
 			// TODO evict page
-			VMKernel.managerLock.acquire();
 			ppn = evictPage();
 			if (ppn < 0) {
 				System.out.println("Evict unsuccessful!");
