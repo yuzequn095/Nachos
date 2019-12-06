@@ -35,6 +35,7 @@ public class VMKernel extends UserKernel {
 		numPagesPinned = 0;
 		managerLock = new Lock();
 		pinCV = new Condition(pinLock);
+		rwLock = new Lock();
 
 		// initialize manager
 		manager = new pageManager[Machine.processor().getNumPhysPages()];
@@ -143,5 +144,7 @@ public class VMKernel extends UserKernel {
 	static int numPagesPinned;
 
 	static Lock managerLock;
+
+	static Lock rwLock;
 
 }
