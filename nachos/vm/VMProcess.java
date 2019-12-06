@@ -205,7 +205,7 @@ public class VMProcess extends UserProcess {
 
 	private int victimFinder() {
 		// clock
-		int ppn = -1;
+		int ppn = 0;
 		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++) {
 			//System.out.println("Iterating victim ppn: " + i + "...");
 			// TODO check if the page is pinned
