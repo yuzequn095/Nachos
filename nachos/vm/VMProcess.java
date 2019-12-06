@@ -78,9 +78,7 @@ public class VMProcess extends UserProcess {
 	private void handlePageFault(int badVaddr) {
 		// VMKernel.managerLock.acquire();
 		System.out.println("Process " + pid + " start to handle page fault!");
-		VMKernel.pagesAvailableMutex.acquire();
 		int vpn = Processor.pageFromAddress(badVaddr);
-		VMKernel.pagesAvailableMutex.release();
 		System.out.println("Vpn at start of handlePageFault: " + vpn);
 		// Find the corresponding coff section from badvaddr
 		VMKernel.pagesAvailableMutex.acquire();
@@ -128,9 +126,7 @@ public class VMProcess extends UserProcess {
 			handleSwapIn(vpn, ppn);
 		} else {
 			if (section != null) {
-				VMKernel.pagesAvailableMutex.acquire();
 				section.loadPage(sectionPageNumber, ppn);
-				VMKernel.pagesAvailableMutex.release();
 			} else {
 				VMKernel.pagesAvailableMutex.acquire();
 				fillWithZero(ppn);
