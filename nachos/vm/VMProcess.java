@@ -101,7 +101,6 @@ public class VMProcess extends UserProcess {
 			// TODO evict page
 			VMKernel.managerLock.acquire();
 			ppn = evictPage();
-			VMKernel.managerLock.release();
 			if (ppn < 0) {
 				System.out.println("Evict unsuccessful!");
 				VMKernel.pagesAvailableMutex.release();
@@ -128,9 +127,9 @@ public class VMProcess extends UserProcess {
 			if (section != null) {
 				section.loadPage(sectionPageNumber, ppn);
 			} else {
-				VMKernel.pagesAvailableMutex.acquire();
+				VMKernel.managerLock.acquire();
 				fillWithZero(ppn);
-				VMKernel.pagesAvailableMutex.release();
+				VMKernel.managerLock.release();
 			}
 		}
 		if (readOnly) {
