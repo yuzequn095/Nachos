@@ -107,6 +107,7 @@ public class VMProcess extends UserProcess {
 		}
 		VMKernel.pagesAvailableMutex.release();
 		// Initialize translationEntry
+		vpn = VMKernel.manager[ppn].getEntry().vpn;
 		System.out.println("Vpn before dirty: " + vpn);
 		boolean dirty = pageTable[vpn].dirty;
 		System.out.println("Newly assigned ppn: " + ppn);
