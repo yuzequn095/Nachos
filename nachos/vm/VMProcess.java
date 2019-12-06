@@ -369,6 +369,7 @@ public class VMProcess extends UserProcess {
 				return totalRead;
 			}
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
+			System.out.println("readVirtualMemory: VPN after updating: " + entry.vpn);
 			pageOffset = Processor.offsetFromAddress(vaddr);
 			paddr = entry.ppn * pageSize + pageOffset;
 			// update cumulative variables
@@ -482,6 +483,7 @@ public class VMProcess extends UserProcess {
 				return totalWrite;
 			}
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
+			System.out.println("readVirtualMemory: VPN after updating: " + entry.vpn);
 			pageOffset = Processor.offsetFromAddress(vaddr);
 			paddr = entry.ppn * pageSize + pageOffset;
 			// update cumulative variables
