@@ -964,6 +964,7 @@ public class UserProcess {
 				System.out.println("invalid argument from memory, argument is null");
 				return -1;
 			}
+			System.out.println("ith arg: " + cur_arg);
 			args[i] = cur_arg;
 		}
 
