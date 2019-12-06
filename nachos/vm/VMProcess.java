@@ -333,6 +333,7 @@ public class VMProcess extends UserProcess {
 			// check if the page is valid
 			if (!entry.valid) {
 				System.out.println("readVirtualMemory: Page fault on vpn: "+ entry.vpn + "ppn: " + entry.ppn);
+				System.out.println(vaddr);
 				handlePageFault(vaddr);
 				// ???? what if the entry is still invalid ????
 				// update paddr
