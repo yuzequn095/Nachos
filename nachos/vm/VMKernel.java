@@ -32,11 +32,10 @@ public class VMKernel extends UserKernel {
 		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
 		spnTotal = 0;
 		// pinLock = new Lock();
-		pinCV = new Condition(rwLock);
 		numPagesPinned = 0;
 		managerLock = new Lock();
 		rwLock = new Lock();
-
+		pinCV = new Condition(rwLock);
 
 		// initialize manager
 		manager = new pageManager[Machine.processor().getNumPhysPages()];
