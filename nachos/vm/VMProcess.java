@@ -76,7 +76,7 @@ public class VMProcess extends UserProcess {
 	 * Case2: stack/heap page, initialize with 0 if clean, load from swap if dirty.
 	 */
 	private void handlePageFault(int badVaddr) {
-		// VMKernel.managerLock.acquire();
+		VMKernel.managerLock.acquire();
 		System.out.println("Process " + pid + " start to handle page fault!");
 		int vpn = Processor.pageFromAddress(badVaddr);
 		System.out.println("Vpn at start of handlePageFault: " + vpn);
@@ -132,6 +132,7 @@ public class VMProcess extends UserProcess {
 		}
 		VMKernel.manager[ppn].setEntry(translationEntry);
 		VMKernel.manager[ppn].setProcess(this);
+		VMKernel.managerLock.release();
 	}
 
 	private Pair sectionFinder(int badVaddr) {
