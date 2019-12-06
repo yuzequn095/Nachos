@@ -33,12 +33,12 @@ public class VMKernel extends UserKernel {
 		swapPages = new LinkedList<>();
 		swapFile = ThreadedKernel.fileSystem.open("swapfile", true);
 		spnTotal = 0;
-		victim = 0;
+		// victim = 0;
 
 		// initialize manager
 		manager = new pageManager[Machine.processor().getNumPhysPages()];
 		for(int i = 0; i < Machine.processor().getNumPhysPages(); i++){
-			manager[i] = new pageManager(null);
+			manager[i] = new pageManager(null, null, false);
 		}
 	}
 
@@ -82,7 +82,7 @@ public class VMKernel extends UserKernel {
 
 	static ArrayList<TranslationEntry> victims;
 
-	static int victim;
+	// static int victim;
 
 	static Lock victimLock;
 
@@ -94,11 +94,39 @@ public class VMKernel extends UserKernel {
 
 	static Lock swapLock;
 
-	class pageManager {
-		public TranslationEntry translationEntry;
+	static class pageManager {
+		private TranslationEntry translationEntry;
+		private VMProcess process;
+		private boolean isPinned;
 
-		public pageManager(TranslationEntry entry) {
+		public pageManager(TranslationEntry entry, VMProcess process, boolean pin) {
 			translationEntry = entry;
+			process = process;
+			isPinned = pin;
+		}
+
+		public TranslationEntry getEntry() {
+			return this.translationEntry;
+		}
+
+		public void setEntry(TranslationEntry entry) {
+			this.translationEntry = entry;
+		}
+
+		public VMProcess getProcess() {
+			return this.process;
+		}
+
+		public void setProcess(VMProcess process) {
+			this.process = process;
+		}
+
+		public boolean getPinStatus() {
+			return this.isPinned;
+		}
+
+		public void setPinStatus(boolean pin) {
+			this.isPinned = pin;
 		}
 	}
 

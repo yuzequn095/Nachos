@@ -115,8 +115,6 @@ public class VMProcess extends UserProcess {
 					System.out.println("Newly assigned ppn: " + ppn);
 					TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, readOnly, true, dirty);
 					pageTable[vpn] = translationEntry;
-					// add vpn to victims
-					VMKernel.victims.add(translationEntry);
 					// Handle swap in
 					if (dirty) {
 						handleSwapIn(vpn, ppn);
@@ -126,7 +124,7 @@ public class VMProcess extends UserProcess {
 					if (readOnly) {
 						System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 					}
-					VMKernel.manager[ppn].translationEntry = translationEntry;
+					VMKernel.manager[ppn].setEntry(translationEntry);
 					return;
 				}
 			}
@@ -159,8 +157,6 @@ public class VMProcess extends UserProcess {
 				System.out.println("Newly assigned ppn: " + ppn);
 				TranslationEntry translationEntry = new TranslationEntry(vpn, ppn, true, false, true, dirty);
 				pageTable[vpn] = translationEntry;
-				// add vpn to victims
-				VMKernel.victims.add(translationEntry);
 				// Handle swap in
 				if (translationEntry.dirty) {
 					handleSwapIn(vpn, ppn);
@@ -168,7 +164,7 @@ public class VMProcess extends UserProcess {
 					// Fill the physical memory with 0
 					fillWithZero(ppn);
 				}
-				VMKernel.manager[ppn].translationEntry = translationEntry;
+				VMKernel.manager[ppn].setEntry(translationEntry);
 				return;
 			}
 		}
@@ -227,34 +223,26 @@ public class VMProcess extends UserProcess {
 			if (false) {
 				continue;
 			}
-			if (!VMKernel.manager[i].translationEntry.used) {
+			TranslationEntry entry = VMKernel.manager[i].getEntry();
+			if (!entry.used) {
 				ppn = i;
 				break;
 			}
-			VMKernel.manager[i].translationEntry.used = false;
+			entry.used = false;
+			VMKernel.manager[i].setEntry(entry);
 			if (i == Machine.processor().getNumPhysPages() - 1) {
 				i = 0;
 			}
 		}
 
-/*		System.out.println("Iterating victim: " + i + "...");
-		// for potential concurrency issue
-		if (VMKernel.victims.get(i) == null) {
-			System.out.println("Another process is evicting this page, continue");
-			continue;
-		}
-*/
-
-		TranslationEntry tempEntry = VMKernel.manager[ppn].translationEntry;
+		TranslationEntry tempEntry = VMKernel.manager[ppn].getEntry();
 		vpn = tempEntry.vpn;
 		ppn = tempEntry.ppn;
 		tempEntry.valid = false;
-		Lib.assertTrue(tempEntry.valid == VMKernel.manager[ppn].translationEntry.valid);
+		Lib.assertTrue(tempEntry.valid == VMKernel.manager[ppn].getEntry().valid);
 		System.out.println("Target victim's vpn: [" + vpn + "]," + "ppn: [" + ppn + "]");
 		// acquire lock for modifying shared data structure
 		VMKernel.victimLock.acquire();
-		// set to null to prevent race condition
-		// VMKernel.victims.set(i, null);
 		VMKernel.victimLock.release();
 
 		// start to evict the page
@@ -264,7 +252,6 @@ public class VMProcess extends UserProcess {
 			handleSwapOut(vpn, ppn);
 		}
 		// processing complete, exit loop
-		// VMKernel.victims.remove(i);
 		System.out.println("Eviction successful!");
 
 		return ppn;
