@@ -110,7 +110,6 @@ public class VMProcess extends UserProcess {
 		}
 		VMKernel.pagesAvailableMutex.release();
 		// Initialize translationEntry
-//		vpn = Processor.pageFromAddress(badVaddr);
 		System.out.println("Vpn before dirty: " + vpn);
 		boolean dirty = pageTable[vpn].dirty;
 		System.out.println("Newly assigned ppn: " + ppn);
@@ -306,7 +305,6 @@ public class VMProcess extends UserProcess {
 	 */
 	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
 		Lib.debug(dbgProcess, "start rVM");
-		// VMKernel.rwLock.acquire();
 		// check offset and length
 		if(offset < 0 || length < 0 || offset + length > data.length){
 			System.out.println("invalid offset:" + offset+" or/and length: "+length+" data.length: " +data.length);
@@ -317,14 +315,12 @@ public class VMProcess extends UserProcess {
 		//check vaddr
 		if (vaddr < 0 || vaddr > pageTable.length * pageSize) {
 			System.out.println("invalid vaddr");
-			// VMKernel.rwLock.release();
 			return 0;
 		}
 		// initialize variables
 		int initialVPN = Processor.pageFromAddress(vaddr);	//this variable won't be updated
 		if (initialVPN >= pageTable.length || initialVPN < 0) {
 			System.out.println("invalid initial vaddr, vpn out of bounds");
-			// VMKernel.rwLock.release();
 			return 0;
 		}
 		TranslationEntry entry = pageTable[initialVPN];
@@ -359,7 +355,6 @@ public class VMProcess extends UserProcess {
 				// release pin when error occur
 				System.out.println("readVirtualMemory: Releasing pin because invalid paddr");
 				releasePin(entry.ppn);
-				// VMKernel.rwLock.release();
 				return totalRead;
 			}
 			// update amount, only updated once
@@ -374,7 +369,6 @@ public class VMProcess extends UserProcess {
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
 				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length + "length: " + length + "total read: " + totalRead);
-				// VMKernel.rwLock.release();
 				return totalRead;
 			}
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
@@ -385,7 +379,6 @@ public class VMProcess extends UserProcess {
 			offset += amount;
 			totalRead += amount;
 		}
-		// VMKernel.rwLock.release();
 		return totalRead;
 	}
 
@@ -421,7 +414,6 @@ public class VMProcess extends UserProcess {
 		// check offset and length first
 		if(offset < 0 || length < 0 || offset + length > data.length){
 			System.out.println("invalid offset or/and length");
-			// VMKernel.rwLock.release();
 			return 0;
 		}
 		// write data to
@@ -429,7 +421,6 @@ public class VMProcess extends UserProcess {
 		// check vaddr is valid
 		if (vaddr < 0 || vaddr > pageTable.length * pageSize) {
 			System.out.println("invalid vaddr");
-			// VMKernel.rwLock.release();
 			return 0;
 		}
 		// initialize variables
@@ -437,7 +428,6 @@ public class VMProcess extends UserProcess {
 
 		if (initialVPN >= pageTable.length || initialVPN < 0) {
 			System.out.println("invalid initial vaddr, vpn out of bounds");
-			// VMKernel.rwLock.release();
 			return 0;
 		}
 		TranslationEntry entry = pageTable[initialVPN];
@@ -470,7 +460,6 @@ public class VMProcess extends UserProcess {
 				// release pin when error occur
 				System.out.println("writeVirtualMemory: Releasing pin because invalid paddr");
 				releasePin(entry.ppn);
-				// VMKernel.rwLock.release();
 				return totalWrite;
 			}
 			// check if the page is read_only
@@ -479,7 +468,6 @@ public class VMProcess extends UserProcess {
 				// release pin when error occur
 				System.out.println("writeVirtualMemory: Releasing pin because page is read only");
 				releasePin(entry.ppn);
-				// VMKernel.rwLock.release();
 				return totalWrite;
 			}
 			// update amount, only updated once
@@ -496,7 +484,6 @@ public class VMProcess extends UserProcess {
 			int curVPN = Processor.pageFromAddress(vaddr);
 			if (curVPN >= pageTable.length) {
 				System.out.println("invalid vpn out of bounds, vpn: " + curVPN + "maximum: " + pageTable.length);
-				// VMKernel.rwLock.release();
 				return totalWrite;
 			}
 			entry = pageTable[Processor.pageFromAddress(vaddr)];
@@ -508,7 +495,6 @@ public class VMProcess extends UserProcess {
 			totalWrite += amount;
 		}
 		System.out.println("writeVirtualMemory: total written to VM: [" + totalWrite + "], exit now.");
-		// VMKernel.rwLock.release();
 		return totalWrite;
 	}
 	/**
