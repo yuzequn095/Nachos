@@ -87,9 +87,10 @@ public class UserProcess {
 		} else {
 			System.out.println("Try to execute filename: " + name);
 		}
-		if (!load(name, args))
+		if (!load(name, args)) {
+			System.out.println("CAN'T LOAD PROGRAM!");
 			return false;
-
+		}
 		thread = new UThread(this);
 		thread.setName(name).fork();
 		UserKernel.runningProcessCounterMutex.acquire();
