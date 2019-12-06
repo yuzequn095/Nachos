@@ -135,7 +135,6 @@ public class VMProcess extends UserProcess {
 		if (readOnly) {
 			System.out.println("Page with vpn [" + translationEntry.vpn + "], ppn [" + translationEntry.ppn + "] is read only");
 		}
-		VMKernel.managerLock.acquire();
 		VMKernel.manager[ppn].setEntry(translationEntry);
 		VMKernel.manager[ppn].setProcess(this);
 		VMKernel.managerLock.release();
