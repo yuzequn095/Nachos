@@ -7,7 +7,8 @@ arising from memory management errors, and improving debugging support.
 * RENDEZVOUS 
   
   Provide a mechanism for threads to exchange data in Nachos. 
-  Multiple threads match by tag and ensure correct data exchange between threads through concurrency management
+  Multiple threads match by tag and ensure correct data exchange 
+  between threads through concurrency management
   See more details on nachos/threads/Rendezvous.java
 
 * Additional software
